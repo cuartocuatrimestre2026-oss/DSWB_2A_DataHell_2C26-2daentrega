@@ -1,0 +1,31 @@
+{
+  "name": "turnoflex-backend-2daentrega",
+  "version": "2.0.0",
+  "description": "Plataforma TurnoFlex - Espacio Sideral S.A.S. - 2do Parcial Backend IFTS 29",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "seed": "node seed.js"
+  },
+  "keywords": ["nodejs",
+    "express",
+    "mongodb",
+    "mongoose",
+    "mvc",
+    "pug"],
+  "author": "Grupo 16 - DataHell",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^18.0.7",
+    "express": "^5.3.0",
+    "express-session": "^1.19.0",
+    "mongoose": "^9.11.1",
+    "pug": "^3.0.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
