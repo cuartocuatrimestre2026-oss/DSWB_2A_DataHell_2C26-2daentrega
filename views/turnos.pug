@@ -1,0 +1,91 @@
+extends layouts/main
+
+block contenido
+  .encabezado-seccion
+    .titulo-con-accion
+      div
+        h2 Grilla Operativa de Turnos (Recepción y Asistencia)
+        p Control de acceso de socios al establecimiento, acreditación en mostrador y gestión de sobrecupos autorizados.
+      div
+        button.btn-secundario(onclick="document.getElementById('modal-sobreturno').classList.toggle('activo')") ⚡ Autorizar Sobreturno
+
+  #modal-sobreturno.caja-desplegable(class=(errorSobreturno ? 'activo' : ''))
+    .formulario-tarjeta
+      h3 ⚡ Autorización de Sobreturno de Recepción (Regla del 15%)
+      p.subtitulo Los sobreturnos exigen justificativo explícito y respetan el aforo máximo del 15% por sala.
+      
+      if errorSobreturno
+        .alerta.alerta-error
+          strong Error: 
+          span= errorSobreturno
+      form(action="/vista/turnos/sobreturno", method="POST", class="form-estilizado")
+        .fila-campos
+          .grupo-campo
+            label(for="clienteId") ID Socio / Paciente:
+            input#clienteId(type="number", name="clienteId", placeholder="Ej: 1", required)
+          .grupo-campo
+            label(for="servicioId") ID Disciplina:
+            input#servicioId(type="number", name="servicioId", placeholder="Ej: 1", required)
+        .fila-campos
+          .grupo-campo
+            label(for="instructorId") ID Docente:
+            input#instructorId(type="number", name="instructorId", placeholder="Ej: 1", required)
+          .grupo-campo
+            label(for="salaId") ID Sala:
+            input#salaId(type="number", name="salaId", placeholder="Ej: 1", required)
+        .fila-campos
+          .grupo-campo
+            label(for="fechaHora") Fecha y Hora:
+            input#fechaHora(type="datetime-local", name="fechaHora", required)
+          .grupo-campo
+            label(for="motivo") Motivo Justificado (Mín. 5 caracteres):
+            input#motivo(type="text", name="motivo", placeholder="Ej: Urgencia médica / derivación", required)
+        button.btn-primario(type="submit") Registrar y Autorizar Sobreturno
+  table.tabla-turnos
+    thead
+      tr
+        th ID Turno
+        th Socio / Cliente
+        th Sala
+        th Fecha y Hora
+        th Estado
+        th Modalidad
+        th Justificación
+        th Control de Ingreso (Recepción)
+    tbody
+      if turnos.length
+        each t in turnos
+          tr(class=t.esSobreturno ? 'fila-sobreturno' : '')
+            td
+              code= t.id
+            td
+              strong= t.clienteDetalle || `Socio #${t.clienteId}`
+            td= t.salaDetalle || `Sala #${t.salaId}`
+            td= new Date(t.fechaHora).toLocaleString('es-AR')
+            td
+              if t.estado === 'reservado'
+                span.badge.badge-reservado Reservado
+              else if t.estado === 'atendido'
+                span.badge.badge-atendido Presente / Atendido
+              else
+                span.badge.badge-cancelado Cancelado
+            td
+              if t.esSobreturno
+                span.badge.badge-sobreturno SOBRETURNO
+              else
+                span.badge.badge-regular REGULAR
+            td= t.motivoSobreturno || '-'
+            td
+              if t.estado === 'reservado'
+                .acciones-fila
+                  form(action=`/vista/turnos/atender/${t.id}`, method="POST" style="display:inline;")
+                    button.btn-exito-chico(type="submit" title="Marcar presente al ingreso del socio") Atender Ingreso
+                  form(action=`/vista/turnos/cancelar/${t.id}`, method="POST" style="display:inline;" onsubmit="return confirm('¿Cancelar este turno?');")
+                    button.btn-peligro-chico(type="submit" title="Cancelar turno") ❌ Cancelar
+              else if t.estado === 'atendido'
+                span.texto-verde-bold ✔ Acreditado
+              else
+                span.texto-apagado -
+      else
+        tr
+          td(colspan="8" style="text-align: center; padding: 25px;") No se registran turnos en la base de datos de MongoDB.

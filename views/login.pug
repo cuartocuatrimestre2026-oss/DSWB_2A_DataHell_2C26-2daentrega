@@ -1,0 +1,24 @@
+extends layouts/main
+
+block contenido
+  .formulario-contenedor
+    .formulario-tarjeta
+      h2 🔑 Ingreso al Sistema
+      p.subtitulo Accedé con tu DNI o Correo Electrónico. El sistema identificará automáticamente si sos Cliente/Paciente o Personal del Establecimiento.
+      if error
+        .alerta.alerta-error
+          strong Error: 
+          span= error
+      form(action="/login", method="POST", class="form-estilizado")
+        .grupo-campo
+          label(for="identificador") Correo Electrónico o DNI:
+          input#identificador(type="text", name="identificador", placeholder="Ej: 38123456 o usuario@mail.com", required)
+        .grupo-campo
+          label(for="password") Contraseña:
+          input#password(type="password", name="password", placeholder="Ingresá tu contraseña", required)
+        button.btn-primario(type="submit") Ingresar a mi Cuenta
+      .enlace-secundario
+        p ¿Sos nuevo paciente? 
+          a(href="/registro") Registrate aquí para reservar clases
+        p.pista-demo
+          small 💡 <strong>Usuarios de prueba:</strong> Recepción: <code>admin@espaciosideral.com</code> / <code>admin123</code> | Socio de prueba: <code>juan.perez@mail.com</code> / <code>123456</code>

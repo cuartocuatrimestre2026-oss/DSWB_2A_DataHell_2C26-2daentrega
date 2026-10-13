@@ -1,0 +1,10 @@
+extends layouts/main
+
+block contenido
+  .error-container
+    h2 ⚠️ Error #{status || 500}
+    p.mensaje-error= mensaje || 'Ha ocurrido un error al procesar la solicitud.'
+    if detalle
+      pre.detalle-error= detalle
+    .acciones-retorno
+      a.btn-volver(href="/") Volver al Inicio

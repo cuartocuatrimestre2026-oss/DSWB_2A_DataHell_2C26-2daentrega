@@ -1,0 +1,66 @@
+extends layouts/main
+
+block contenido
+  .hero-card
+    h2 Plataforma Integral de Turnos y Aforos - Espacio Sideral S.A.S.
+    p.subtitulo Sistema de autogestión para socios/pacientes y consola operativa para el personal de recepción.
+    if !usuarioActual
+      .acciones-hero
+        a.btn-primario.btn-grande(href="/registro") Registrarse como Nuevo Socio
+        a.btn-secundario.btn-grande(href="/login") Iniciar Sesión
+  .metricas-grid
+    .tarjeta-metrica
+      h3 Turnos Registrados
+      p.numero-metrica= totalTurnos
+      if usuarioActual && usuarioActual.rol === 'empleado'
+        a.btn-link(href="/vista/turnos") Ver Grilla Operativa &rarr;
+      else if usuarioActual && usuarioActual.rol === 'cliente'
+        a.btn-link(href="/mis-turnos") Ver Mis Turnos &rarr;
+      else
+        span.etiqueta-info Base NoSQL MongoDB
+    .tarjeta-metrica
+      h3 Socios / Pacientes
+      p.numero-metrica= totalClientes
+      if usuarioActual && usuarioActual.rol === 'empleado'
+        a.btn-link(href="/vista/clientes") Ver Padrón &rarr;
+      else
+        span.etiqueta-info Autogestión habilitada
+    .tarjeta-metrica
+      h3 Salas y Espacios
+      p.numero-metrica= totalSalas
+      span.etiqueta-info Aforo monitoreado
+    .tarjeta-metrica
+      h3 Disciplinas Ofertadas
+      p.numero-metrica= totalServicios
+      span.etiqueta-info Catálogo oficial
+  .info-bloques
+    .bloque-destacado
+      h3 👤 Funcionalidades por Perfil
+      ul
+        li
+          strong Socios / Pacientes: 
+          span Registro público autónomo, selección libre de disciplinas y reservas sin intermediarios con prevención de solapamientos.
+        li
+          strong Personal de Recepción: 
+          span Acreditación presencial de socios al ingresar, control de asistencia, verificación de aforo y autorización justificada de sobreturnos (máx. 15%).
+        li
+          strong Persistencia NoSQL: 
+          span Gestión íntegra sobre MongoDB utilizando esquemas y modelos definidos con Mongoose.
+    .bloque-destacado
+      h3 🚀 Accesos Rápidos a la API REST (JSON)
+      ul
+        li
+          code GET /turnos
+          span  - Listado general de reservas en formato JSON.
+        li
+          code GET /clientes
+          span  - Padrón completo de socios en formato JSON.
+        li
+          code GET /salas
+          span  - Espacios físicos y cálculo de sobreturnos.
+        li
+          code GET /servicios
+          span  - Catálogo de disciplinas deportivas.
+        li
+          code GET /instructores
+          span  - Padrón de docentes y especialidades.

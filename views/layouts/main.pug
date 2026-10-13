@@ -1,0 +1,34 @@
+doctype html
+html(lang="es")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport", content="width=device-width, initial-scale=1.0")
+    title TurnoFlex | Espacio Sideral
+    link(rel="stylesheet", href="/css/styles.css")
+  body
+    header.navbar
+      .marca
+        h1
+          a(href="/") Espacio Sideral - TurnoFlex
+        span.subtitulo-marca Sistema de Gestión Deportiva y Aforos
+      nav.nav-links
+        a(href="/") Inicio
+        if usuarioActual
+          if usuarioActual.rol === 'empleado'
+            a(href="/vista/turnos") Consola de Recepción
+            a(href="/vista/clientes") Padrón General
+            span.etiqueta-usuario Recepción: #{usuarioActual.nombre}
+            a.btn-salir(href="/logout") Cerrar Sesión
+          else
+            a(href="/mis-turnos") Mis Turnos
+            a(href="/reservar") Reservar Clase
+            span.etiqueta-usuario Hola, #{usuarioActual.nombre}
+            a.btn-salir(href="/logout") Cerrar Sesión
+        else
+          a.btn-nav-login(href="/login") Iniciar Sesión
+          a.btn-nav-registro(href="/registro") Registrarse
+    main.container
+      block contenido
+    footer.footer
+      p IFTS N° 29 - Desarrollo Web Backend | Grupo 16 - DataHell (Comisión A)
+      p Persistencia NoSQL con MongoDB y Mongoose

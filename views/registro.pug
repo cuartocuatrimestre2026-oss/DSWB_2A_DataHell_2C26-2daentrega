@@ -1,0 +1,36 @@
+extends layouts/main
+
+block contenido
+  .formulario-contenedor
+    .formulario-tarjeta
+      h2 Registro de Nuevo Socio / Paciente
+      p.subtitulo Creá tu cuenta en Espacio Sideral para reservar tus clases y actividades deportivas de forma autónoma.
+      if error
+        .alerta.alerta-error
+          strong Error: 
+          span= error
+      form(action="/registro", method="POST", class="form-estilizado")
+        .fila-campos
+          .grupo-campo
+            label(for="nombre") Nombre:
+            input#nombre(type="text", name="nombre", value=(valores ? valores.nombre : ''), placeholder="Ej: Juan", required)
+          .grupo-campo
+            label(for="apellido") Apellido:
+            input#apellido(type="text", name="apellido", value=(valores ? valores.apellido : ''), placeholder="Ej: Pérez", required)
+        .fila-campos
+          .grupo-campo
+            label(for="dni") DNI:
+            input#dni(type="text", name="dni", value=(valores ? valores.dni : ''), placeholder="Sin puntos ni espacios", required)
+          .grupo-campo
+            label(for="telefono") Teléfono:
+            input#telefono(type="tel", name="telefono", value=(valores ? valores.telefono : ''), placeholder="Ej: 1145678901")
+        .grupo-campo
+          label(for="email") Correo Electrónico:
+          input#email(type="email", name="email", value=(valores ? valores.email : ''), placeholder="nombre@correo.com", required)
+        .grupo-campo
+          label(for="password") Contraseña:
+          input#password(type="password", name="password", placeholder="Ingresá una contraseña", required)
+        button.btn-primario(type="submit") Registrarse y Comenzar
+      .enlace-secundario
+        p ¿Ya tenés cuenta creada? 
+          a(href="/login") Iniciar sesión aquí

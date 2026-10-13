@@ -1,0 +1,40 @@
+extends layouts/main
+
+block contenido
+  .formulario-contenedor
+    .formulario-tarjeta
+      h2 📅 Reservar Turno para Actividad
+      p.subtitulo Seleccioná la actividad deportiva, el docente a cargo y el horario de tu preferencia.
+      if error
+        .alerta.alerta-error
+          strong Error al reservar: 
+          span= error
+      form(action="/reservar", method="POST", class="form-estilizado")
+        .grupo-campo
+          label(for="servicioId") Actividad / Disciplina:
+          select#servicioId(name="servicioId", required)
+            option(value="") -- Seleccionar actividad --
+            each s in servicios
+              option(value=s.id)= `${s.nombre} (${s.modalidad}) - Duración: ${s.duracionMinutos} min`
+        .grupo-campo
+          label(for="instructorId") Instructor / Docente:
+          select#instructorId(name="instructorId", required)
+            option(value="") -- Seleccionar docente --
+            each i in instructores
+              option(value=i.id)= `${i.apellido}, ${i.nombre} - Especialidad: ${i.especialidad}`
+        .grupo-campo
+          label(for="salaId") Sala / Espacio Físico:
+          select#salaId(name="salaId", required)
+            option(value="") -- Seleccionar sala --
+            each sala in salas
+              option(value=sala.id)= `${sala.nombre} (Capacidad estándar: ${sala.capacidadNormal} personas)`
+        .fila-campos
+          .grupo-campo
+            label(for="fecha") Fecha:
+            input#fecha(type="date", name="fecha", required)
+          .grupo-campo
+            label(for="hora") Horario de Inicio:
+            input#hora(type="time", name="hora", required)
+        button.btn-primario(type="submit") Confirmar Reserva Regular
+      .enlace-secundario
+        a.btn-volver(href="/mis-turnos") &larr; Volver a Mis Turnos
