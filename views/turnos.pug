@@ -5,19 +5,20 @@ block contenido
     .titulo-con-accion
       div
         h2 Grilla Operativa de Turnos (Recepción y Asistencia)
-        p Control de acceso de socios al establecimiento, acreditación en mostrador y gestión de sobrecupos autorizados.
+        p Control de acceso de socios al establecimiento, acreditación en mostrador (Check-in RF-02) y gestión de sobrecupos autorizados.
       div
         button.btn-secundario(onclick="document.getElementById('modal-sobreturno').classList.toggle('activo')") ⚡ Autorizar Sobreturno
 
   #modal-sobreturno.caja-desplegable(class=(errorSobreturno ? 'activo' : ''))
     .formulario-tarjeta
       h3 ⚡ Autorización de Sobreturno de Recepción (Regla del 15%)
-      p.subtitulo Los sobreturnos exigen justificativo explícito y respetan el aforo máximo del 15% por sala.
+      p.subtitulo Los sobreturnos exigen justificativo explícito (mínimo 5 caracteres) y respetan el aforo máximo del 15% por sala.
       
       if errorSobreturno
         .alerta.alerta-error
           strong Error: 
           span= errorSobreturno
+
       form(action="/vista/turnos/sobreturno", method="POST", class="form-estilizado")
         .fila-campos
           .grupo-campo
@@ -41,16 +42,17 @@ block contenido
             label(for="motivo") Motivo Justificado (Mín. 5 caracteres):
             input#motivo(type="text", name="motivo", placeholder="Ej: Urgencia médica / derivación", required)
         button.btn-primario(type="submit") Registrar y Autorizar Sobreturno
+
   table.tabla-turnos
     thead
       tr
         th ID Turno
         th Socio / Cliente
+        th Apto Físico / Alerta Postural
         th Sala
         th Fecha y Hora
         th Estado
         th Modalidad
-        th Justificación
         th Control de Ingreso (Recepción)
     tbody
       if turnos.length
@@ -60,6 +62,13 @@ block contenido
               code= t.id
             td
               strong= t.clienteDetalle || `Socio #${t.clienteId}`
+            td
+              if t.aptoMedicoVigente
+                span.badge.badge-atendido Apto Vigente
+              else
+                span.badge.badge-cancelado Vencido
+              if t.patologiasActivas
+                span.badge.badge-sobreturno(style="margin-left: 5px;") ⚠️ #{t.patologiasActivas}
             td= t.salaDetalle || `Sala #${t.salaId}`
             td= new Date(t.fechaHora).toLocaleString('es-AR')
             td
@@ -74,7 +83,6 @@ block contenido
                 span.badge.badge-sobreturno SOBRETURNO
               else
                 span.badge.badge-regular REGULAR
-            td= t.motivoSobreturno || '-'
             td
               if t.estado === 'reservado'
                 .acciones-fila

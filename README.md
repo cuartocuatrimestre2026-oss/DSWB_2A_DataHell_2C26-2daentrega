@@ -1,30 +1,30 @@
-# TurnoFlex - Sistema de Gestión de Turnos y Aforos
-> **API RESTful y Consola Interna para Espacio Sideral S.A.S.**  
-> **Segundo Parcial - Desarrollo Web Backend (IFTS N° 29 - 2C2026 - Comisión A)**  
-> **Empresa de Desarrollo: DataHell (Grupo 16)**
+# TurnoFlex - Sistema Integral de Gestión de Turnos y Aforos
+> **API RESTful y Consola Operativa para Espacio Sideral S.A.S.**  
+> **Entrega Final (3° Parcial) - Desarrollo Web Backend (IFTS N° 29 - 2C2026 - Comisión A)**  
+> **Empresa de Desarrollo: DataHell (Grupo 16)**  
+> **Despliegue Cloud en Vivo:** [https://turnoflex-backend.onrender.com](https://turnoflex-backend.onrender.com) (o tu URL de Render)
 
+---
 
 ## Integrantes y Responsabilidades
-
-- **Mariela Andrea Lorenzo:** Líder Técnico y Arquitectura de Persistencia NoSQL (Configuración del servidor Express en `app.js`, conexión a MongoDB mediante Mongoose en `config/db.js` y script de inicialización idempotente `seed.js`).
-- **Sonia Candela Pereira:** Desarrolladora de Dominio y Lógica POO (Modelado de esquemas Mongoose `Turno`, `Sala`, `Cliente`, `Servicio`, `Instructor`, métodos de instancia de ciclo de vida `atender()` / `cancelar()`, y algoritmo de aforo con truncamiento del 15%).
-- **Johana Micaela Navarro:** Desarrolladora de Rutas, Middlewares y Seguridad (Enrutadores modulares, gestión de sesiones con `express-session`, middleware de acceso por roles `authMiddleware`, auditoría con `loggerMiddleware` y sanitización con `validarIdMiddleware`).
+- **Mariela Andrea Lorenzo:** Líder Técnico y Arquitectura de Persistencia NoSQL (Configuración del servidor Express en `app.js`, conexión a MongoDB Atlas mediante Mongoose en `config/db.js` y script de inicialización idempotente `seed.js`).
+- **Sonia Candela Pereira:** Desarrolladora de Dominio y Lógica POO (Modelado de esquemas Mongoose `Turno`, `Sala`, `Cliente`, `Servicio`, `Instructor`, métodos de instancia `atender()` / `cancelar()`, algoritmo de aforo con truncamiento del 15% y articulación con RF-02 de Apto Médico).
+- **Johana Micaela Navarro:** Desarrolladora de Rutas, Middlewares y Seguridad (Enrutadores modulares, gestión híbrida de sesiones con `express-session` y tokens `JWT`, encriptación de claves con `bcryptjs`, auditoría con `loggerMiddleware` y sanitización con `validarIdMiddleware`).
 - **Sergio Alberto Arenhardt:** Desarrollador Frontend Pug & UI (Plantillas Server-Side `main.pug`, `index.pug`, `turnos.pug`, `mis-turnos.pug`, `reservar.pug`, `login.pug`, `registro.pug`, `clientes.pug`, `error.pug` y diseño responsivo en `styles.css` con paleta institucional en variables CSS).
-- **Elena Beatriz González:** Especialista en QA, Testing y Documentación (Diseño y ejecución de la suite de pruebas en Thunder Client, validación de códigos de estado HTTP 200, 201, 400, 404, 409, matriz de evidencias y articulación con Ingeniería de Software).
+- **Elena Beatriz González:** Especialista en QA, Testing y Documentación (Diseño y ejecución de la suite de pruebas en Thunder Client, validación de códigos de estado HTTP 200, 201, 400, 401, 403, 404, 409, matriz de evidencias y articulación con Ingeniería de Software).
 
 ---
 
 ## Tecnologías y Arquitectura
-
 - **Entorno de Ejecución:** Node.js (LTS v20+ / Motor V8).
 - **Framework Web:** Express.js (v5.x).
 - **Patrón de Arquitectura:** MVC (Modelo-Vista-Controlador) modular desacoplado.
-- **Motor de Base de Datos:** MongoDB Community Server (v6.0 / v7.0) en entorno local.
-- **Object Data Modeling (ODM):** Mongoose (v8.x / v9.x) con esquemas tipados, índices únicos, validaciones nativas y métodos de dominio.
-- **Seguridad y Credenciales:** Desacople de llaves mediante variables de entorno protegidas con `dotenv` y `.gitignore`. Control de fuerza bruta (bloqueo por 15 minutos tras 3 fallos consecutivos en login).
-- **Preservación Histórica:** Política de baja lógica (`estado: 'activo' | 'inactivo' | 'licencia'`), eliminando el borrado físico de la base de datos.
-- **Motor de Vistas:** Pug (renderizado del lado del servidor con control de sesión para roles `empleado` y `cliente`).
-- **Nomenclatura Estandarizada:** Notación por puntos (`*.controller.js`, `*.routes.js` y `*.js` para modelos).
+- **Motor de Base de Datos:** MongoDB Atlas (Cloud Cluster M0 Sandbox) y MongoDB Community local.
+- **Object Data Modeling (ODM):** Mongoose (v9.x) con validaciones nativas y métodos de instancia de dominio.
+- **Seguridad Criptográfica:** Hash de contraseñas con `bcryptjs` (salt 10 rondas), mitigación de fuerza bruta con suspensión por 15 minutos tras 3 fallos consecutivos (`bloqueadoHasta`).
+- **Autenticación Híbrida:** Sesiones de servidor (`express-session`) con cookies HttpOnly para el portal web Pug, y Tokens `JWT` (`jsonwebtoken`) con expiración de 8 horas para consumo de la API REST.
+- **Preservación Histórica:** Política de baja lógica (`estado: 'activo' | 'inactivo' | 'licencia'`).
+- **Motor de Vistas:** Pug (renderizado server-side diferenciado para roles `empleado` y `cliente`).
 
 ---
 
@@ -32,10 +32,8 @@
 
 ### 1. Clonar el repositorio
 ```bash
-git clone [https://github.com/](https://githubcom/)[USUARIO]/turnoflex-backend-2daentrega.git
-cd turnoflex-backend-2daentrega
-```
----
+git clone [https://github.com/cuartocuatrimestre2026-oss/DSWB_2A_DataHell_2C26-2daentrega.git](https://github.com/cuartocuatrimestre2026-oss/DSWB_2A_DataHell_2C26-2daentrega.git)
+cd DSWB_2A_DataHell_2C26-2daentrega
 
 ### 2. Instalar dependencias
 ```bash
@@ -51,8 +49,10 @@ cp .env.example .env
 
 Verificar que el archivo .env contenga la cadena de conexión local y el puerto:
 PORT=3000
-MONGODB_URI=mongodb://127.0.0.1:27017/turnoflex
+MONGODB_URI=mongodb+srv://cuartocuatrimestre2026_db_user:qUtjKnV5tX3ldhez@cluster0.cfx59jp.mongodb.net/turnoflex?retryWrites=true&w=majority
 SESSION_SECRET= [PASSWORD]
+JWT_SECRET= [PASSWORD]
+NODE_ENV=development
 
 ---
 

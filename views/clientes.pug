@@ -12,6 +12,7 @@ block contenido
         th DNI
         th Correo Electrónico
         th Teléfono
+        th Apto Físico
         th Perfil / Rol
         th Estado
     tbody
@@ -27,6 +28,13 @@ block contenido
             td= c.telefono || 'Sin teléfono'
             td
               if c.rol === 'empleado'
+                span.texto-apagado N/A
+              else if c.aptoMedicoVigente
+                span.badge.badge-atendido Apto al día
+              else
+                span.badge.badge-cancelado Apto Pendiente
+            td
+              if c.rol === 'empleado'
                 span.badge.badge-empleado Personal Administrativo
               else
                 span.badge.badge-regular Socio / Paciente
@@ -39,7 +47,7 @@ block contenido
                 span.badge.badge-cancelado Inactivo (Histórico)
       else
         tr
-          td(colspan="7" style="text-align: center; padding: 25px;") No se registran usuarios en la base de datos.
+          td(colspan="8" style="text-align: center; padding: 25px;") No se registran usuarios en la base de datos.
   .acciones-retorno
     a.btn-volver(href="/") &larr; Volver al Inicio
     a.btn-volver(href="/vista/turnos") Ir a la Grilla de Recepción &rarr;

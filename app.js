@@ -8,7 +8,7 @@ const loggerMiddleware = require('./middlewares/loggerMiddleware');
 const manejoErroresMiddleware = require('./middlewares/manejoErroresMiddleware');
 const { estaAutenticado, esEmpleado } = require('./middlewares/authMiddleware');
 
-// Importación de rutas modulares.
+// Rutas modulares.
 const authRoutes = require('./routes/auth.routes');
 const pacienteRoutes = require('./routes/paciente.routes');
 const turnosRoutes = require('./routes/turnos.routes');
@@ -17,7 +17,7 @@ const serviciosRoutes = require('./routes/servicios.routes');
 const instructoresRoutes = require('./routes/instructores.routes');
 const salasRoutes = require('./routes/salas.routes');
 
-// Modelos de Mongoose.
+// Modelos y controladores.
 const Turno = require('./models/Turno');
 const Cliente = require('./models/Cliente');
 const Sala = require('./models/Sala');
@@ -32,9 +32,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(loggerMiddleware);
 
-// Sesiones de usuario en memoria.
+// Sesiones de usuario.
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'turnoflex_super_secreto_2026',
+    secret: process.env.SESSION_SECRET || 'turnoflex_super_secreto_session_2026',
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -48,12 +48,12 @@ app.use((req, res, next) => {
     next();
 });
 
-// Recursos estáticos y motor de plantillas Pug.
+// Recursos estáticos y vistas Pug.
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
 
-// Rutas de autenticación y portal del paciente.
+// Rutas web de autenticación y portal de socios.
 app.use('/', authRoutes);
 app.use('/', pacienteRoutes);
 
@@ -91,20 +91,25 @@ app.get('/vista/turnos', estaAutenticado, esEmpleado, async (req, res, next) => 
             Cliente.find(),
             Sala.find()
         ]);
-        const clientesMap = new Map(clientes.map(c => [Number(c.id), `${c.apellido}, ${c.nombre} (DNI ${c.dni})`]));
+        const clientesMap = new Map(clientes.map(c => [Number(c.id), c]));
         const salasMap = new Map(salas.map(s => [Number(s.id), s.nombre]));
 
-        const turnosMapeados = turnos.map(t => ({
-            id: t.id,
-            clienteId: t.clienteId,
-            clienteDetalle: clientesMap.get(Number(t.clienteId)) || `Socio #${t.clienteId}`,
-            salaId: t.salaId,
-            salaDetalle: salasMap.get(Number(t.salaId)) || `Sala #${t.salaId}`,
-            fechaHora: t.fechaHora,
-            estado: t.estado,
-            esSobreturno: t.esSobreturno,
-            motivoSobreturno: t.motivoSobreturno
-        }));
+        const turnosMapeados = turnos.map(t => {
+            const clienteObj = clientesMap.get(Number(t.clienteId));
+            return {
+                id: t.id,
+                clienteId: t.clienteId,
+                clienteDetalle: clienteObj ? `${clienteObj.apellido}, ${clienteObj.nombre} (DNI ${clienteObj.dni})` : `Socio #${t.clienteId}`,
+                aptoMedicoVigente: clienteObj ? clienteObj.aptoMedicoVigente : true,
+                patologiasActivas: clienteObj ? clienteObj.patologiasActivas : '',
+                salaId: t.salaId,
+                salaDetalle: salasMap.get(Number(t.salaId)) || `Sala #${t.salaId}`,
+                fechaHora: t.fechaHora,
+                estado: t.estado,
+                esSobreturno: t.esSobreturno,
+                motivoSobreturno: t.motivoSobreturno
+            };
+        });
 
         res.render('turnos', {
             turnos: turnosMapeados,
@@ -117,45 +122,7 @@ app.get('/vista/turnos', estaAutenticado, esEmpleado, async (req, res, next) => 
 
 app.post('/vista/turnos/atender/:id', estaAutenticado, esEmpleado, turnosController.marcarAtendidoWeb);
 app.post('/vista/turnos/cancelar/:id', estaAutenticado, esEmpleado, turnosController.cancelarWeb);
-
-app.post('/vista/turnos/sobreturno', estaAutenticado, esEmpleado, async (req, res, next) => {
-    try {
-        const { clienteId, servicioId, instructorId, salaId, fechaHora, motivo } = req.body;
-        if (!motivo || typeof motivo !== 'string' || motivo.trim().length < 5) {
-            return res.redirect('/vista/turnos?errorSobreturno=' + encodeURIComponent('El motivo de justificación es obligatorio (mínimo 5 caracteres).'));
-        }
-        const sala = await Sala.findOne({ id: Number(salaId) });
-        if (!sala) {
-            return res.redirect('/vista/turnos?errorSobreturno=' + encodeURIComponent('La sala indicada no existe.'));
-        }
-        const fechaHoraObj = new Date(fechaHora);
-        const sobreturnosActuales = await Turno.countDocuments({
-            salaId: Number(salaId),
-            fechaHora: fechaHoraObj,
-            estado: 'reservado',
-            esSobreturno: true
-        });
-        if (!sala.admiteSobreturno(sobreturnosActuales)) {
-            return res.redirect('/vista/turnos?errorSobreturno=' + encodeURIComponent(`Se superó el tope del 15% de sobrecupo permitido para esta sala (${sala.calcularSobreturnosPermitidos()} lugar/es).`));
-        }
-        const ultimo = await Turno.findOne().sort({ id: -1 });
-        const idNuevo = (ultimo && ultimo.id) ? ultimo.id + 1 : 1;
-        await Turno.create({
-            id: idNuevo,
-            clienteId: Number(clienteId),
-            servicioId: Number(servicioId),
-            instructorId: Number(instructorId),
-            salaId: Number(salaId),
-            fechaHora: fechaHoraObj,
-            estado: 'reservado',
-            esSobreturno: true,
-            motivoSobreturno: motivo.trim()
-        });
-        res.redirect('/vista/turnos');
-    } catch (error) {
-        next(error);
-    }
-});
+app.post('/vista/turnos/sobreturno', estaAutenticado, esEmpleado, turnosController.crearSobreturnoWeb);
 
 app.get('/vista/clientes', estaAutenticado, esEmpleado, async (req, res, next) => {
     try {
@@ -184,7 +151,7 @@ app.use((req, res) => {
 // Middleware centralizado de errores.
 app.use(manejoErroresMiddleware);
 
-// Inicio del servidor con conexión a MongoDB.
+// Inicio del servidor y conexión.
 async function iniciarServidor() {
     try {
         await connectDB();

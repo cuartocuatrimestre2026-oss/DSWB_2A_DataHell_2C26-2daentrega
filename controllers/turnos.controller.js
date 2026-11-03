@@ -54,14 +54,12 @@ exports.crearRegular = async (req, res, next) => {
         if (!clienteId || !servicioId || !instructorId || !salaId || !fechaHora) {
             return res.status(400).json({ error: "Validación fallida", detalle: "Todos los campos son obligatorios." });
         }
-
         const [cliente, servicio, instructor, sala] = await Promise.all([
             Cliente.findOne({ id: Number(clienteId) }),
             Servicio.findOne({ id: Number(servicioId) }),
             Instructor.findOne({ id: Number(instructorId) }),
             Sala.findOne({ id: Number(salaId) })
         ]);
-
         if (!cliente || !servicio || !instructor || !sala) {
             return res.status(404).json({ error: "Entidad inexistente", detalle: "Cliente, servicio, instructor o sala no encontrados." });
         }
@@ -88,7 +86,7 @@ exports.crearRegular = async (req, res, next) => {
             return res.status(409).json({ error: "Conflicto", detalle: "El cliente ya tiene una reserva en ese horario." });
         }
 
-        // Controla la capacidad regular de la sala.
+        // Control de capacidad regular de sala.
         const reservasRegulares = await Turno.countDocuments({
             salaId: Number(salaId),
             fechaHora: fechaHoraObj,
@@ -104,7 +102,6 @@ exports.crearRegular = async (req, res, next) => {
 
         const ultimo = await Turno.findOne().sort({ id: -1 });
         const nuevoId = (ultimo && ultimo.id) ? ultimo.id + 1 : 1;
-
         const nuevoTurno = await Turno.create({
             id: nuevoId,
             clienteId: Number(clienteId),
@@ -123,7 +120,7 @@ exports.crearRegular = async (req, res, next) => {
     }
 };
 
-// Alta de Sobreturno exclusivo para recepción
+// Alta de Sobreturno exclusivo para recepción (API).
 exports.crearSobreturno = async (req, res, next) => {
     try {
         const { clienteId, servicioId, instructorId, salaId, fechaHora, motivo } = req.body;
@@ -133,13 +130,12 @@ exports.crearSobreturno = async (req, res, next) => {
                 detalle: "El campo 'motivo' es mandatorio para sobreturnos (mínimo 5 caracteres)."
             });
         }
-
         const sala = await Sala.findOne({ id: Number(salaId) });
         if (!sala) {
             return res.status(404).json({ error: "No encontrado", detalle: "Sala no encontrada." });
         }
-
         const fechaHoraObj = new Date(fechaHora);
+
         const sobreturnosActuales = await Turno.countDocuments({
             salaId: Number(salaId),
             fechaHora: fechaHoraObj,
@@ -156,7 +152,6 @@ exports.crearSobreturno = async (req, res, next) => {
 
         const ultimo = await Turno.findOne().sort({ id: -1 });
         const nuevoId = (ultimo && ultimo.id) ? ultimo.id + 1 : 1;
-
         const nuevoTurno = await Turno.create({
             id: nuevoId,
             clienteId: Number(clienteId),
@@ -198,7 +193,6 @@ exports.actualizarEstado = async (req, res, next) => {
         if (!turno) {
             return res.status(404).json({ error: "No encontrado", detalle: "El turno solicitado no existe." });
         }
-
         if (estado === "atendido") {
             turno.atender();
         } else if (estado === "cancelado") {
@@ -228,7 +222,7 @@ exports.actualizarEstado = async (req, res, next) => {
     }
 };
 
-// Acciones específicas para interfaz web de recepción
+// Acciones específicas para interfaz web de recepción.
 exports.marcarAtendidoWeb = async (req, res, next) => {
     try {
         const turno = await Turno.findOne({ id: Number(req.params.id) });
@@ -249,6 +243,46 @@ exports.cancelarWeb = async (req, res, next) => {
             turno.cancelar();
             await turno.save();
         }
+        res.redirect('/vista/turnos');
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Controlador MVC para creación de sobreturno desde la vista.
+exports.crearSobreturnoWeb = async (req, res, next) => {
+    try {
+        const { clienteId, servicioId, instructorId, salaId, fechaHora, motivo } = req.body;
+        if (!motivo || typeof motivo !== 'string' || motivo.trim().length < 5) {
+            return res.redirect('/vista/turnos?errorSobreturno=' + encodeURIComponent('El motivo de justificación es obligatorio (mínimo 5 caracteres).'));
+        }
+        const sala = await Sala.findOne({ id: Number(salaId) });
+        if (!sala) {
+            return res.redirect('/vista/turnos?errorSobreturno=' + encodeURIComponent('La sala indicada no existe.'));
+        }
+        const fechaHoraObj = new Date(fechaHora);
+        const sobreturnosActuales = await Turno.countDocuments({
+            salaId: Number(salaId),
+            fechaHora: fechaHoraObj,
+            estado: 'reservado',
+            esSobreturno: true
+        });
+        if (!sala.admiteSobreturno(sobreturnosActuales)) {
+            return res.redirect('/vista/turnos?errorSobreturno=' + encodeURIComponent(`Se superó el tope del 15% de sobrecupo permitido para esta sala (${sala.calcularSobreturnosPermitidos()} lugar/es).`));
+        }
+        const ultimo = await Turno.findOne().sort({ id: -1 });
+        const idNuevo = (ultimo && ultimo.id) ? ultimo.id + 1 : 1;
+        await Turno.create({
+            id: idNuevo,
+            clienteId: Number(clienteId),
+            servicioId: Number(servicioId),
+            instructorId: Number(instructorId),
+            salaId: Number(salaId),
+            fechaHora: fechaHoraObj,
+            estado: 'reservado',
+            esSobreturno: true,
+            motivoSobreturno: motivo.trim()
+        });
         res.redirect('/vista/turnos');
     } catch (error) {
         next(error);

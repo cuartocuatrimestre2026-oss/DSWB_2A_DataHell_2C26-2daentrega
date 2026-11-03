@@ -4,6 +4,7 @@ const authController = require('../controllers/auth.controller');
 
 router.get('/login', authController.mostrarLogin);
 router.post('/login', authController.procesarLogin);
+router.post('/login/token', authController.generarTokenJWT); // Endpoint API JWT
 router.get('/registro', authController.mostrarRegistro);
 router.post('/registro', authController.procesarRegistro);
 router.get('/logout', authController.cerrarSesion);

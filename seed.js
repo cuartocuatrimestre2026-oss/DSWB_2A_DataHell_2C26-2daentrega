@@ -1,5 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const connectDB = require('./config/db');
 const Cliente = require('./models/Cliente');
 const Instructor = require('./models/Instructor');
@@ -21,7 +22,7 @@ async function inicializarBaseDeDatos() {
         console.log(`[Seed] ${seedData.salas.length} salas insertadas.`);
     }
 
-    // Cargar los Instructores.
+    // Carga los Instructores.
     const totalInstructores = await Instructor.countDocuments();
     if (totalInstructores === 0) {
         await Instructor.insertMany(seedData.instructores);
@@ -35,19 +36,27 @@ async function inicializarBaseDeDatos() {
         console.log(`[Seed] ${seedData.servicios.length} servicios insertados.`);
     }
 
-    // Cargar los Clientes - Socios.
+    // Carga Clientes / Socios con contraseñas encriptadas con bcrypt.
     const totalClientes = await Cliente.countDocuments();
     if (totalClientes === 0) {
+        const salt = await bcrypt.genSalt(10);
+        const passHasheada = await bcrypt.hash('123456', salt);
+
         const clientesParaInsertar = seedData.clientes.map(c => ({
             ...c,
-            password: '123456',
-            rol: 'cliente'
+            password: passHasheada,
+            rol: 'cliente',
+            aptoMedicoVigente: true,
+            patologiasActivas: c.id === 1 ? 'Precaución: Lesión Lumbar L4-L5' : ''
         }));
         await Cliente.insertMany(clientesParaInsertar);
-        console.log(`[Seed] ${clientesParaInsertar.length} clientes insertados.`);
+        console.log(`[Seed] ${clientesParaInsertar.length} clientes insertados con credenciales seguras.`);
     }
 
-    // Garantiza siempre la existencia del usuario administrativo de recepción.
+    // Garantiza usuario administrativo de recepción con contraseña encriptada.
+    const saltAdmin = await bcrypt.genSalt(10);
+    const passAdminHasheada = await bcrypt.hash('admin123', saltAdmin);
+
     await Cliente.findOneAndUpdate(
         { email: 'admin@espaciosideral.com' },
         {
@@ -57,14 +66,16 @@ async function inicializarBaseDeDatos() {
             dni: '99999999',
             email: 'admin@espaciosideral.com',
             telefono: '1140009999',
-            password: 'admin123',
-            rol: 'empleado'
+            password: passAdminHasheada,
+            rol: 'empleado',
+            estado: 'activo',
+            aptoMedicoVigente: true
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
     );
-    console.log('[Seed] Usuario administrativo (admin@espaciosideral.com / admin123) habilitado.');
+    console.log('[Seed] Usuario administrativo (admin@espaciosideral.com) habilitado con hash bcrypt.');
 
-    // Carga los Turnos.
+    // Carga Turnos.
     const totalTurnos = await Turno.countDocuments();
     if (totalTurnos === 0) {
         const turnosParaInsertar = seedData.turnos.map(t => ({

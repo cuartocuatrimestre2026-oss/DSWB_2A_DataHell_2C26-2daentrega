@@ -36,16 +36,15 @@ const clienteSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: [true, 'La contraseña es obligatoria'],
-        default: '123456'
+        required: [true, 'La contraseña es obligatoria']
     },
     rol: {
         type: String,
         enum: ['cliente', 'empleado'],
         default: 'cliente'
     },
-    
-    // El estado de la persona permanece en la Base de Datos, se da de baja de forma logica.
+
+    // Baja lógica sin borrado físico en la BD.
     estado: {
         type: String,
         enum: ['activo', 'inactivo', 'licencia'],
@@ -58,8 +57,19 @@ const clienteSchema = new mongoose.Schema({
             message: 'El estado "licencia" solo aplica al personal administrativo.'
         }
     },
+    
+    // Control de Apto Médico y Salud Postural.
+    aptoMedicoVigente: {
+        type: Boolean,
+        default: true
+    },
+    patologiasActivas: {
+        type: String,
+        trim: true,
+        default: ''
+    },
 
-    // Bloqueo temporal por reintentos fallidos.
+    // Seguridad y Mitigación de Fuerza Bruta.
     intentosFallidos: {
         type: Number,
         default: 0
