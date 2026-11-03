@@ -2,7 +2,7 @@
 > **API RESTful y Consola Operativa para Espacio Sideral S.A.S.**  
 > **Entrega Final (3° Parcial) - Desarrollo Web Backend (IFTS N° 29 - 2C2026 - Comisión A)**  
 > **Empresa de Desarrollo: DataHell (Grupo 16)**  
-> **Despliegue Cloud en Vivo:** [https://turnoflex-backend.onrender.com](https://turnoflex-backend.onrender.com) (o tu URL de Render)
+> **Despliegue Cloud en Vivo:** [https://turnoflex-espacio-sideral.onrender.com/](https://turnoflex-espacio-sideral.onrender.com/)
 
 ---
 
@@ -34,6 +34,7 @@
 ```bash
 git clone [https://github.com/cuartocuatrimestre2026-oss/DSWB_2A_DataHell_2C26-2daentrega.git](https://github.com/cuartocuatrimestre2026-oss/DSWB_2A_DataHell_2C26-2daentrega.git)
 cd DSWB_2A_DataHell_2C26-2daentrega
+```
 
 ### 2. Instalar dependencias
 ```bash
