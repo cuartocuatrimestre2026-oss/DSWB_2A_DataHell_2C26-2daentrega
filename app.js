@@ -31,6 +31,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(loggerMiddleware);
+app.set('trust proxy', 1);
 
 // Sesiones de usuario con soporte condicional para secure en producción.
 app.use(session({
