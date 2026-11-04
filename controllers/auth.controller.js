@@ -1,6 +1,64 @@
 const Cliente = require('../models/Cliente');
-const bcrypt = require('bcryptjs');
+const Contador = require('../models/Contador');
 const jwt = require('jsonwebtoken');
+
+// Lógica de autenticación centralizada para Web y API.
+async function autenticarUsuario(identificador, password) {
+    if (!identificador || !password) {
+        return { exito: false, status: 400, mensaje: 'Por favor complete su correo electrónico/DNI y contraseña.' };
+    }
+
+    const termino = String(identificador).trim().toLowerCase();
+    const usuario = await Cliente.findOne({
+        $or: [
+            { email: termino },
+            { dni: String(identificador).trim() }
+        ]
+    });
+
+    if (!usuario) {
+        return { exito: false, status: 401, mensaje: 'Credenciales inválidas. Verifique sus datos e intente nuevamente.' };
+    }
+
+    // Control de suspensión por fuerza bruta.
+    if (usuario.bloqueadoHasta && usuario.bloqueadoHasta > new Date()) {
+        const minutosRestantes = Math.ceil((usuario.bloqueadoHasta - new Date()) / (1000 * 60));
+        return { 
+            exito: false, 
+            status: 403, 
+            mensaje: `Acceso suspendido temporalmente por seguridad por reiterados intentos fallidos. Intente nuevamente en ${minutosRestantes} minuto(s).` 
+        };
+    }
+
+    // Control de estados del usuario.
+    if (usuario.estado === 'inactivo') {
+        return { exito: false, status: 403, mensaje: 'Su cuenta se encuentra inactiva. Comuníquese con la administración de Espacio Sideral.' };
+    }
+    if (usuario.estado === 'licencia') {
+        return { exito: false, status: 403, mensaje: 'El usuario se encuentra actualmente bajo período de licencia laboral.' };
+    }
+
+    // Validación de contraseña.
+    const esValida = await usuario.compararPassword(password);
+    if (!esValida) {
+        usuario.intentosFallidos = (usuario.intentosFallidos || 0) + 1;
+        if (usuario.intentosFallidos >= 3) {
+            usuario.bloqueadoHasta = new Date(Date.now() + 15 * 60 * 1000);
+            await usuario.save();
+            return { exito: false, status: 403, mensaje: 'Superó el límite de 3 intentos fallidos. Su acceso quedó suspendido temporalmente por 15 minutos.' };
+        }
+        await usuario.save();
+        const intentosRestantes = 3 - usuario.intentosFallidos;
+        return { exito: false, status: 401, mensaje: `Contraseña incorrecta. Le resta(n) ${intentosRestantes} intento(s) antes del bloqueo temporal.` };
+    }
+
+    // Restablecimiento de fallos.
+    usuario.intentosFallidos = 0;
+    usuario.bloqueadoHasta = null;
+    await usuario.save();
+
+    return { exito: true, usuario };
+}
 
 exports.mostrarLogin = (req, res) => {
     if (req.session && req.session.usuario) {
@@ -12,84 +70,13 @@ exports.mostrarLogin = (req, res) => {
 exports.procesarLogin = async (req, res, next) => {
     try {
         const { identificador, password } = req.body;
-        if (!identificador || !password) {
-            return res.render('login', {
-                error: 'Por favor complete su correo electrónico/DNI y contraseña.'
-            });
-        }
-        const termino = String(identificador).trim().toLowerCase();
-        
-        // Busca usuario por email o DNI.
-        const usuario = await Cliente.findOne({
-            $or: [
-                { email: termino },
-                { dni: String(identificador).trim() }
-            ]
-        });
+        const resultado = await autenticarUsuario(identificador, password);
 
-        if (!usuario) {
-            return res.render('login', {
-                error: 'Credenciales inválidas. Verifique sus datos e intente nuevamente.'
-            });
+        if (!resultado.exito) {
+            return res.render('login', { error: resultado.mensaje });
         }
 
-        // Verifica suspensión por fuerza bruta.
-        if (usuario.bloqueadoHasta && usuario.bloqueadoHasta > new Date()) {
-            const minutosRestantes = Math.ceil((usuario.bloqueadoHasta - new Date()) / (1000 * 60));
-            return res.render('login', {
-                error: `Acceso suspendido temporalmente por seguridad por reiterados intentos fallidos. Intente nuevamente en ${minutosRestantes} minuto(s).`
-            });
-        }
-
-        // Verifica estado en la BD.
-        if (usuario.estado === 'inactivo') {
-            return res.render('login', {
-                error: 'Su cuenta se encuentra inactiva. Comuníquese con la administración de Espacio Sideral.'
-            });
-        }
-        if (usuario.estado === 'licencia') {
-            return res.render('login', {
-                error: 'El usuario se encuentra actualmente bajo período de licencia laboral.'
-            });
-        }
-
-        // Validación criptográfica de contraseña con bcrypt.
-        let passValida = false;
-        if (usuario.password.startsWith('$2a$') || usuario.password.startsWith('$2b$')) {
-            passValida = await bcrypt.compare(String(password).trim(), usuario.password);
-        } else {
-            passValida = (usuario.password === String(password).trim());
-            // Si coincide en texto plano, migra automáticamente a hash bcrypt.
-            if (passValida) {
-                const salt = await bcrypt.genSalt(10);
-                usuario.password = await bcrypt.hash(String(password).trim(), salt);
-                await usuario.save();
-            }
-        }
-
-        if (!passValida) {
-            usuario.intentosFallidos = (usuario.intentosFallidos || 0) + 1;
-            
-            if (usuario.intentosFallidos >= 3) {
-                usuario.bloqueadoHasta = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
-                await usuario.save();
-                return res.render('login', {
-                    error: 'Superó el límite de 3 intentos fallidos. Su acceso quedó suspendido temporalmente por 15 minutos.'
-                });
-            }
-            
-            await usuario.save();
-            const intentosRestantes = 3 - usuario.intentosFallidos;
-            return res.render('login', {
-                error: `Contraseña incorrecta. Le resta(n) ${intentosRestantes} intento(s) antes del bloqueo temporal.`
-            });
-        }
-
-        // Login exitoso: resetea contador y guarda sesión.
-        usuario.intentosFallidos = 0;
-        usuario.bloqueadoHasta = null;
-        await usuario.save();
-
+        const usuario = resultado.usuario;
         req.session.usuario = {
             id: usuario.id,
             nombre: usuario.nombre,
@@ -111,38 +98,22 @@ exports.procesarLogin = async (req, res, next) => {
     }
 };
 
-// Generador de Token JWT para consumo API / Thunder Client
 exports.generarTokenJWT = async (req, res, next) => {
     try {
         const { identificador, password } = req.body;
-        if (!identificador || !password) {
-            return res.status(400).json({
-                error: "Datos incompletos",
-                detalle: "Debe enviar identificador (email o DNI) y password."
+        const resultado = await autenticarUsuario(identificador, password);
+
+        if (!resultado.exito) {
+            return res.status(resultado.status).json({
+                error: "Autenticación fallida",
+                detalle: resultado.mensaje
             });
         }
 
-        const termino = String(identificador).trim().toLowerCase();
-        const usuario = await Cliente.findOne({
-            $or: [
-                { email: termino },
-                { dni: String(identificador).trim() }
-            ]
-        });
-
-        if (!usuario) {
-            return res.status(401).json({ error: "Credenciales inválidas" });
-        }
-
-        let passValida = false;
-        if (usuario.password.startsWith('$2a$') || usuario.password.startsWith('$2b$')) {
-            passValida = await bcrypt.compare(String(password).trim(), usuario.password);
-        } else {
-            passValida = (usuario.password === String(password).trim());
-        }
-
-        if (!passValida) {
-            return res.status(401).json({ error: "Contraseña incorrecta" });
+        const usuario = resultado.usuario;
+        const secreto = process.env.JWT_SECRET;
+        if (!secreto) {
+            return res.status(500).json({ error: "Error de configuración", detalle: "JWT_SECRET no definido." });
         }
 
         const payload = {
@@ -153,11 +124,7 @@ exports.generarTokenJWT = async (req, res, next) => {
             rol: usuario.rol
         };
 
-        const token = jwt.sign(
-            payload,
-            process.env.JWT_SECRET || 'turnoflex_jwt_secreto_criptografico_2026',
-            { expiresIn: '8h' }
-        );
+        const token = jwt.sign(payload, secreto, { expiresIn: '8h' });
 
         res.status(200).json({
             mensaje: "Autenticación JWT exitosa",
@@ -205,11 +172,8 @@ exports.procesarRegistro = async (req, res, next) => {
             });
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const passwordHasheada = await bcrypt.hash(String(password).trim(), salt);
-
-        const ultimo = await Cliente.findOne().sort({ id: -1 });
-        const nuevoId = (ultimo && ultimo.id) ? ultimo.id + 1 : 1;
+        // Generación del ID con Contador.
+        const nuevoId = await Contador.obtenerSiguienteId('clientes');
 
         const nuevoCliente = await Cliente.create({
             id: nuevoId,
@@ -218,7 +182,7 @@ exports.procesarRegistro = async (req, res, next) => {
             dni: dni.trim(),
             email: email.toLowerCase().trim(),
             telefono: telefono ? telefono.trim() : '',
-            password: passwordHasheada,
+            password: password.trim(),
             rol: 'cliente',
             estado: 'activo',
             aptoMedicoVigente: true,

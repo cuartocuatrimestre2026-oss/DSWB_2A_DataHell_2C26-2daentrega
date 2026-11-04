@@ -11,9 +11,17 @@ function verificarJWT(req, res, next) {
     }
 
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+    const secreto = process.env.JWT_SECRET;
+
+    if (!secreto) {
+        return res.status(500).json({
+            error: "Error de configuración",
+            detalle: "La clave JWT_SECRET no está definida en el entorno del servidor."
+        });
+    }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'turnoflex_jwt_secreto_criptografico_2026');
+        const decoded = jwt.verify(token, secreto);
         req.usuarioJWT = decoded;
         next();
     } catch (err) {

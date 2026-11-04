@@ -9,10 +9,10 @@ router.get('/:id', validarId, turnosController.obtenerPorId);
 router.get('/cliente/:id', validarId, turnosController.obtenerPorCliente);
 router.get('/instructor/:id', validarId, turnosController.obtenerPorInstructor);
 
-// Endpoints mutacionales con protección opcional/flexible de JWT: admite sesión o JWT.
-router.post('/', turnosController.crearRegular);
-router.post('/sobreturno', turnosController.crearSobreturno);
-router.put('/:id', validarId, turnosController.actualizarEstado);
-router.delete('/:id', validarId, turnosController.cancelar);
+// Operaciones de gestión protegidas con JWT.
+router.post('/', verificarJWT, turnosController.crearRegular);
+router.post('/sobreturno', verificarJWT, turnosController.crearSobreturno);
+router.put('/:id', verificarJWT, validarId, turnosController.actualizarEstado);
+router.delete('/:id', verificarJWT, validarId, turnosController.cancelar);
 
 module.exports = router;

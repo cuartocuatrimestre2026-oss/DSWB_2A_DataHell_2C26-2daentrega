@@ -2,11 +2,14 @@ const express = require('express');
 const router = express.Router();
 const salasController = require('../controllers/salas.controller');
 const validarId = require('../middlewares/validarIdMiddleware');
+const verificarJWT = require('../middlewares/jwtMiddleware');
 
 router.get('/', salasController.obtenerTodos);
 router.get('/:id', validarId, salasController.obtenerPorId);
-router.post('/', salasController.crear);
-router.put('/:id', validarId, salasController.actualizar);
-router.delete('/:id', validarId, salasController.eliminar);
+
+// Creación, edición y eliminación administrativa protegidas.
+router.post('/', verificarJWT, salasController.crear);
+router.put('/:id', verificarJWT, validarId, salasController.actualizar);
+router.delete('/:id', verificarJWT, validarId, salasController.eliminar);
 
 module.exports = router;

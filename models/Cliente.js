@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const clienteSchema = new mongoose.Schema({
     id: {
@@ -57,8 +58,8 @@ const clienteSchema = new mongoose.Schema({
             message: 'El estado "licencia" solo aplica al personal administrativo.'
         }
     },
-    
-    // Control de Apto Médico y Salud Postural.
+
+    // Apto Médico y Salud Postural.
     aptoMedicoVigente: {
         type: Boolean,
         default: true
@@ -85,5 +86,22 @@ const clienteSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+// Hashea la contraseña automáticamente si fue modificada.
+clienteSchema.pre('save', async function() {
+    if (!this.isModified('password')) return;
+    if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) return;
+    
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password.trim(), salt);
+});
+
+// Método de dominio para validar contraseña.
+clienteSchema.methods.compararPassword = async function(candidata) {
+    if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) {
+        return await bcrypt.compare(String(candidata).trim(), this.password);
+    }
+    return this.password === String(candidata).trim();
+};
 
 module.exports = mongoose.model('Cliente', clienteSchema);

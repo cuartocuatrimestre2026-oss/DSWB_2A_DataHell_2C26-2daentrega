@@ -1,4 +1,5 @@
 const Servicio = require('../models/Servicio');
+const Contador = require('../models/Contador');
 
 exports.obtenerTodos = async (req, res, next) => {
     try {
@@ -30,9 +31,8 @@ exports.crear = async (req, res, next) => {
                 detalle: "Nombre, modalidad, duración en minutos y sala requerida son obligatorios."
             });
         }
-        const ultimo = await Servicio.findOne().sort({ id: -1 });
-        const nuevoId = (ultimo && ultimo.id) ? ultimo.id + 1 : 1;
 
+        const nuevoId = await Contador.obtenerSiguienteId('servicios');
         const nuevoServicio = await Servicio.create({
             id: nuevoId,
             nombre: nombre.trim(),
@@ -40,7 +40,6 @@ exports.crear = async (req, res, next) => {
             duracionMinutos: Number(duracionMinutos),
             salaRequerida: Number(salaRequerida)
         });
-
         res.status(201).json({ mensaje: "Servicio creado exitosamente", servicio: nuevoServicio });
     } catch (error) {
         next(error);

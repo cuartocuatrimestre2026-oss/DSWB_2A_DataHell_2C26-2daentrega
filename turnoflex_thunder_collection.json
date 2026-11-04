@@ -1,0 +1,79 @@
+{
+  "clientName": "Thunder Client",
+  "collectionName": "TurnoFlex - Colección de Pruebas",
+  "dateExported": "2026-11-04",
+  "version": "1.1",
+  "folders": [],
+  "requests": [
+    {
+      "name": "01 - Obtener Token Admin (JWT)",
+      "method": "POST",
+      "url": "http://localhost:3000/login/token",
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"identificador\": \"admin@espaciosideral.com\",\n  \"password\": \"admin123\"\n}"
+      }
+    },
+    {
+      "name": "02 - Alta Regular Exitosa (201)",
+      "method": "POST",
+      "url": "http://localhost:3000/turnos",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{jwt_token}}" }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"clienteId\": 1,\n  \"servicioId\": 1,\n  \"instructorId\": 1,\n  \"salaId\": 1,\n  \"fechaHora\": \"2026-11-20T18:00:00\"\n}"
+      }
+    },
+    {
+      "name": "03 - Rechazo por Superposición Horaria (409)",
+      "method": "POST",
+      "url": "http://localhost:3000/turnos",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{jwt_token}}" }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"clienteId\": 1,\n  \"servicioId\": 1,\n  \"instructorId\": 1,\n  \"salaId\": 1,\n  \"fechaHora\": \"2026-11-20T18:00:00\"\n}"
+      }
+    },
+    {
+      "name": "04 - Alta de Sobreturno Autorizado (201)",
+      "method": "POST",
+      "url": "http://localhost:3000/turnos/sobreturno",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{jwt_token}}" }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"clienteId\": 2,\n  \"servicioId\": 1,\n  \"instructorId\": 1,\n  \"salaId\": 1,\n  \"fechaHora\": \"2026-11-20T18:00:00\",\n  \"motivo\": \"Derivación médica justificada de kinesiología\"\n}"
+      }
+    },
+    {
+      "name": "05 - Rechazo de Sobreturno sin Motivo (400)",
+      "method": "POST",
+      "url": "http://localhost:3000/turnos/sobreturno",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{jwt_token}}" }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"clienteId\": 2,\n  \"servicioId\": 1,\n  \"instructorId\": 1,\n  \"salaId\": 1,\n  \"fechaHora\": \"2026-11-20T18:00:00\",\n  \"motivo\": \"\"\n}"
+      }
+    },
+    {
+      "name": "06 - Padrón de Clientes Protegido (GET)",
+      "method": "GET",
+      "url": "http://localhost:3000/clientes",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{jwt_token}}" }
+      ]
+    }
+  ]
+}

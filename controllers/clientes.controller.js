@@ -1,5 +1,5 @@
 const Cliente = require('../models/Cliente');
-const bcrypt = require('bcryptjs');
+const Contador = require('../models/Contador');
 
 exports.obtenerTodos = async (req, res, next) => {
     try {
@@ -36,11 +36,8 @@ exports.crear = async (req, res, next) => {
             return res.status(409).json({ error: "Conflicto", detalle: "Ya existe un usuario con ese DNI o email." });
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const passwordHasheada = await bcrypt.hash(password || '123456', salt);
+        const nuevoId = await Contador.obtenerSiguienteId('clientes');
 
-        const ultimo = await Cliente.findOne().sort({ id: -1 });
-        const nuevoId = (ultimo && ultimo.id) ? ultimo.id + 1 : 1;
         const nuevoCliente = await Cliente.create({
             id: nuevoId,
             nombre: nombre.trim(),
@@ -48,7 +45,7 @@ exports.crear = async (req, res, next) => {
             dni: dni.trim(),
             email: email.toLowerCase().trim(),
             telefono: telefono ? telefono.trim() : "",
-            password: passwordHasheada,
+            password: password ? password.trim() : '123456',
             rol: rol || 'cliente',
             estado: estado || 'activo',
             aptoMedicoVigente: aptoMedicoVigente !== undefined ? aptoMedicoVigente : true,
@@ -66,22 +63,30 @@ exports.crear = async (req, res, next) => {
 
 exports.actualizar = async (req, res, next) => {
     try {
-        const datosActualizar = { ...req.body };
-        if (datosActualizar.password) {
-            const salt = await bcrypt.genSalt(10);
-            datosActualizar.password = await bcrypt.hash(datosActualizar.password, salt);
-        }
+        // Bloqueo de escalada de privilegios.
+        const datosPermitidos = { ...req.body };
+        delete datosPermitidos.rol;
+        delete datosPermitidos.estado;
+        delete datosPermitidos.id;
 
-        const actualizado = await Cliente.findOneAndUpdate(
-            { id: Number(req.params.id) },
-            datosActualizar,
-            { new: true, runValidators: true }
-        ).select('-password');
-
-        if (!actualizado) {
+        const cliente = await Cliente.findOne({ id: Number(req.params.id) });
+        if (!cliente) {
             return res.status(404).json({ error: "No encontrado", detalle: "Cliente no encontrado para actualizar." });
         }
-        res.status(200).json(actualizado);
+
+        // Si se actualiza la contraseña, se asigna para que actúe el pre-save hook.
+        if (datosPermitidos.password) {
+            cliente.password = datosPermitidos.password.trim();
+            delete datosPermitidos.password;
+        }
+
+        Object.assign(cliente, datosPermitidos);
+        await cliente.save();
+
+        const clienteRespuesta = cliente.toObject();
+        delete clienteRespuesta.password;
+
+        res.status(200).json(clienteRespuesta);
     } catch (error) {
         next(error);
     }

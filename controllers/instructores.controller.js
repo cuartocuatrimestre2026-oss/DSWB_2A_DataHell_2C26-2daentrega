@@ -1,4 +1,5 @@
 const Instructor = require('../models/Instructor');
+const Contador = require('../models/Contador');
 
 exports.obtenerTodos = async (req, res, next) => {
     try {
@@ -30,9 +31,8 @@ exports.crear = async (req, res, next) => {
                 detalle: "Nombre, apellido, especialidad y email son obligatorios."
             });
         }
-        const ultimo = await Instructor.findOne().sort({ id: -1 });
-        const nuevoId = (ultimo && ultimo.id) ? ultimo.id + 1 : 1;
 
+        const nuevoId = await Contador.obtenerSiguienteId('instructores');
         const nuevoInstructor = await Instructor.create({
             id: nuevoId,
             nombre: nombre.trim(),
@@ -40,7 +40,6 @@ exports.crear = async (req, res, next) => {
             especialidad: especialidad.trim(),
             email: email.toLowerCase().trim()
         });
-
         res.status(201).json({ mensaje: "Instructor creado exitosamente", instructor: nuevoInstructor });
     } catch (error) {
         next(error);

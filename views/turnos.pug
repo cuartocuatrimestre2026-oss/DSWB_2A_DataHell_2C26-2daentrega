@@ -7,7 +7,7 @@ block contenido
         h2 Grilla Operativa de Turnos (Recepción y Asistencia)
         p Control de acceso de socios al establecimiento, acreditación en mostrador (Check-in RF-02) y gestión de sobrecupos autorizados.
       div
-        button.btn-secundario(onclick="document.getElementById('modal-sobreturno').classList.toggle('activo')") ⚡ Autorizar Sobreturno
+        button#btn-toggle-sobreturno.btn-secundario(type="button") ⚡ Autorizar Sobreturno
 
   #modal-sobreturno.caja-desplegable(class=(errorSobreturno ? 'activo' : ''))
     .formulario-tarjeta
@@ -68,9 +68,9 @@ block contenido
               else
                 span.badge.badge-cancelado Vencido
               if t.patologiasActivas
-                span.badge.badge-sobreturno(style="margin-left: 5px;") ⚠️ #{t.patologiasActivas}
+                span.badge.badge-sobreturno ⚠️ #{t.patologiasActivas}
             td= t.salaDetalle || `Sala #${t.salaId}`
-            td= new Date(t.fechaHora).toLocaleString('es-AR')
+            td= new Date(t.fechaHora).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })
             td
               if t.estado === 'reservado'
                 span.badge.badge-reservado Reservado
@@ -86,14 +86,14 @@ block contenido
             td
               if t.estado === 'reservado'
                 .acciones-fila
-                  form(action=`/vista/turnos/atender/${t.id}`, method="POST" style="display:inline;")
-                    button.btn-exito-chico(type="submit" title="Marcar presente al ingreso del socio") Atender Ingreso
-                  form(action=`/vista/turnos/cancelar/${t.id}`, method="POST" style="display:inline;" onsubmit="return confirm('¿Cancelar este turno?');")
-                    button.btn-peligro-chico(type="submit" title="Cancelar turno") ❌ Cancelar
+                  form(action=`/vista/turnos/atender/${t.id}`, method="POST")
+                    button.btn-exito-chico(type="submit", title="Marcar presente al ingreso del socio") Atender Ingreso
+                  form(action=`/vista/turnos/cancelar/${t.id}`, method="POST", data-confirm="¿Cancelar este turno?")
+                    button.btn-peligro-chico(type="submit", title="Cancelar turno") ❌ Cancelar
               else if t.estado === 'atendido'
                 span.texto-verde-bold ✔ Acreditado
               else
                 span.texto-apagado -
       else
         tr
-          td(colspan="8" style="text-align: center; padding: 25px;") No se registran turnos en la base de datos de MongoDB.
+          td(colspan="8") No se registran turnos en la base de datos de MongoDB.

@@ -44,12 +44,12 @@ block contenido
             td= t.esSobreturno ? 'SOBRETURNO' : 'REGULAR'
             td
               if t.estado === 'reservado'
-                form(action=`/mis-turnos/cancelar/${t.id}`, method="POST", onsubmit="return confirm('¿Seguro que deseas cancelar esta reserva?');")
+                form(action=`/mis-turnos/cancelar/${t.id}`, method="POST", data-confirm="¿Seguro que deseas cancelar esta reserva?")
                   button.btn-peligro-chico(type="submit") Cancelar
               else
                 span.texto-apagado -
       else
         tr
-          td(colspan="8" style="text-align: center; padding: 30px;")
+          td(colspan="8")
             p Todavía no tenés ningún turno reservado.
-            a.btn-primario(href="/reservar" style="display: inline-block; margin-top: 10px;") Reservá tu primera clase ahora &rarr;
+            a.btn-primario(href="/reservar") Reservá tu primera clase ahora &rarr;

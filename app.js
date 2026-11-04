@@ -32,17 +32,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(loggerMiddleware);
 
-// Sesiones de usuario.
+// Sesiones de usuario con soporte condicional para secure en producción.
 app.use(session({
     secret: process.env.SESSION_SECRET || 'turnoflex_super_secreto_session_2026',
     resave: false,
     saveUninitialized: false,
     cookie: {
-        maxAge: 1000 * 60 * 60 * 24 // 24 horas
+        maxAge: 1000 * 60 * 60 * 24, // 24 horas
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production'
     }
 }));
 
-// Disponibilidad del usuario logueado en todas las plantillas Pug.
+// Disponibilidad del usuario logueado en plantillas Pug.
 app.use((req, res, next) => {
     res.locals.usuarioActual = (req.session && req.session.usuario) ? req.session.usuario : null;
     next();
@@ -57,7 +59,7 @@ app.set('views', path.join(__dirname, 'views'));
 app.use('/', authRoutes);
 app.use('/', pacienteRoutes);
 
-// Rutas de la API REST (JSON).
+// Rutas de la API REST.
 app.use('/turnos', turnosRoutes);
 app.use('/clientes', clientesRoutes);
 app.use('/servicios', serviciosRoutes);
@@ -133,25 +135,33 @@ app.get('/vista/clientes', estaAutenticado, esEmpleado, async (req, res, next) =
     }
 });
 
-// Manejo de recursos no encontrados (404).
+// Manejo de recursos no encontrados (404) con detección estricta de rutas API.
 app.use((req, res) => {
-    if (req.accepts('html')) {
+    const esRutaApi = req.originalUrl.startsWith('/turnos') ||
+                      req.originalUrl.startsWith('/clientes') ||
+                      req.originalUrl.startsWith('/salas') ||
+                      req.originalUrl.startsWith('/servicios') ||
+                      req.originalUrl.startsWith('/instructores') ||
+                      req.originalUrl.startsWith('/login/token');
+
+    if (!esRutaApi && req.accepts('html') && !req.xhr) {
         return res.status(404).render('error', {
             status: 404,
             mensaje: "Recurso no encontrado",
             detalle: `La ruta solicitada '${req.originalUrl}' no existe en el servidor.`
         });
     }
+
     res.status(404).json({
         error: "Ruta no encontrada",
-        detalle: `El endpoint '${req.originalUrl}' no existe.`
+        detalle: `El endpoint '${req.originalUrl}' no existe en la API REST.`
     });
 });
 
 // Middleware centralizado de errores.
 app.use(manejoErroresMiddleware);
 
-// Inicio del servidor y conexión.
+// Inicio del servidor.
 async function iniciarServidor() {
     try {
         await connectDB();
@@ -165,6 +175,8 @@ async function iniciarServidor() {
     }
 }
 
-iniciarServidor();
+if (process.env.NODE_ENV !== 'test') {
+    iniciarServidor();
+}
 
 module.exports = app;

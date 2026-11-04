@@ -2,6 +2,16 @@ const Turno = require('../models/Turno');
 const Servicio = require('../models/Servicio');
 const Instructor = require('../models/Instructor');
 const Sala = require('../models/Sala');
+const turnosService = require('../services/turnos.service');
+
+// Función auxiliar para cargar catálogos en un único punto.
+async function cargarCatalogos() {
+    return await Promise.all([
+        Servicio.find().sort({ id: 1 }),
+        Instructor.find().sort({ id: 1 }),
+        Sala.find().sort({ id: 1 })
+    ]);
+}
 
 // Lista los turnos del paciente logueado.
 exports.verMisTurnos = async (req, res, next) => {
@@ -25,8 +35,8 @@ exports.verMisTurnos = async (req, res, next) => {
                 servicioNombre: serviciosMap.get(Number(t.servicioId)) || `Servicio #${t.servicioId}`,
                 instructorNombre: instructoresMap.get(Number(t.instructorId)) || `Instructor #${t.instructorId}`,
                 salaNombre: salasMap.get(Number(t.salaId)) || `Sala #${t.salaId}`,
-                fechaFormateada: fecha.toLocaleDateString('es-AR'),
-                horaFormateada: fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+                fechaFormateada: fecha.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
+                horaFormateada: fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
                 estado: t.estado,
                 esSobreturno: t.esSobreturno
             };
@@ -42,14 +52,10 @@ exports.verMisTurnos = async (req, res, next) => {
     }
 };
 
-// Formulario de reserva autónoma.
+// Formulario de reserva.
 exports.mostrarFormularioReserva = async (req, res, next) => {
     try {
-        const [servicios, instructores, salas] = await Promise.all([
-            Servicio.find(),
-            Instructor.find(),
-            Sala.find()
-        ]);
+        const [servicios, instructores, salas] = await cargarCatalogos();
         res.render('reservar', {
             servicios,
             instructores,
@@ -62,140 +68,33 @@ exports.mostrarFormularioReserva = async (req, res, next) => {
     }
 };
 
-// Procesamiento de reserva autónoma.
+// Procesamiento de reserva usando el servicio de dominio unificado.
 exports.procesarReserva = async (req, res, next) => {
     try {
         const clienteId = req.session.usuario.id;
         const { servicioId, instructorId, salaId, fecha, hora } = req.body;
 
-        if (!servicioId || !instructorId || !salaId || !fecha || !hora) {
-            const [servicios, instructores, salas] = await Promise.all([
-                Servicio.find(),
-                Instructor.find(),
-                Sala.find()
-            ]);
-            return res.render('reservar', {
-                servicios,
-                instructores,
-                salas,
-                error: 'Por favor complete todos los campos requeridos para la reserva.',
-                usuario: req.session.usuario
-            });
-        }
-
-        const fechaHoraObj = new Date(`${fecha}T${hora}:00`);
-        if (isNaN(fechaHoraObj.getTime())) {
-            const [servicios, instructores, salas] = await Promise.all([
-                Servicio.find(),
-                Instructor.find(),
-                Sala.find()
-            ]);
-            return res.render('reservar', {
-                servicios,
-                instructores,
-                salas,
-                error: 'La fecha y hora seleccionada no es válida.',
-                usuario: req.session.usuario
-            });
-        }
-
-        const sala = await Sala.findOne({ id: Number(salaId) });
-        if (!sala) {
-            const [servicios, instructores, salas] = await Promise.all([
-                Servicio.find(),
-                Instructor.find(),
-                Sala.find()
-            ]);
-            return res.render('reservar', {
-                servicios,
-                instructores,
-                salas,
-                error: 'La sala seleccionada no existe.',
-                usuario: req.session.usuario
-            });
-        }
-
-        // Valida que el paciente no tenga ya un turno reservado en ese mismo horario.
-        const turnoExistente = await Turno.findOne({
-            clienteId: Number(clienteId),
-            fechaHora: fechaHoraObj,
-            estado: 'reservado'
-        });
-        if (turnoExistente) {
-            const [servicios, instructores, salas] = await Promise.all([
-                Servicio.find(),
-                Instructor.find(),
-                Sala.find()
-            ]);
-            return res.render('reservar', {
-                servicios,
-                instructores,
-                salas,
-                error: 'Ya tenés un turno reservado para esa misma fecha y horario.',
-                usuario: req.session.usuario
-            });
-        }
-
-        // Valida la disponibilidad del instructor.
-        const instructorOcupado = await Turno.findOne({
-            instructorId: Number(instructorId),
-            fechaHora: fechaHoraObj,
-            estado: 'reservado'
-        });
-        if (instructorOcupado) {
-            const [servicios, instructores, salas] = await Promise.all([
-                Servicio.find(),
-                Instructor.find(),
-                Sala.find()
-            ]);
-            return res.render('reservar', {
-                servicios,
-                instructores,
-                salas,
-                error: 'El instructor seleccionado ya cuenta con otra clase en ese horario.',
-                usuario: req.session.usuario
-            });
-        }
-
-        // Valida el aforo regular de sala.
-        const turnosRegulares = await Turno.countDocuments({
-            salaId: Number(salaId),
-            fechaHora: fechaHoraObj,
-            estado: 'reservado',
-            esSobreturno: false
-        });
-        if (turnosRegulares >= sala.capacidadNormal) {
-            const [servicios, instructores, salas] = await Promise.all([
-                Servicio.find(),
-                Instructor.find(),
-                Sala.find()
-            ]);
-            return res.render('reservar', {
-                servicios,
-                instructores,
-                salas,
-                error: `El aforo regular de la sala está completo (${sala.capacidadNormal} cupos). Solo recepción puede autorizar sobreturnos justificados.`,
-                usuario: req.session.usuario
-            });
-        }
-
-        // Crea un nuevo turno.
-        const ultimoTurno = await Turno.findOne().sort({ id: -1 });
-        const nuevoId = (ultimoTurno && ultimoTurno.id) ? ultimoTurno.id + 1 : 1;
-
-        await Turno.create({
-            id: nuevoId,
-            clienteId: Number(clienteId),
-            servicioId: Number(servicioId),
-            instructorId: Number(instructorId),
-            salaId: Number(salaId),
-            fechaHora: fechaHoraObj,
-            estado: 'reservado',
-            esSobreturno: false,
-            motivoSobreturno: null
+        const resultado = await turnosService.crearTurnoRegularDominio({
+            clienteId,
+            servicioId,
+            instructorId,
+            salaId,
+            fecha,
+            hora
         });
 
-        res.redirect('/mis-turnos?exito=Tu turno fue reservado exitosamente.');
+        if (resultado.error) {
+            const [servicios, instructores, salas] = await cargarCatalogos();
+            return res.render('reservar', {
+                servicios,
+                instructores,
+                salas,
+                error: resultado.mensaje,
+                usuario: req.session.usuario
+            });
+        }
+
+        res.redirect('/mis-turnos?exito=' + encodeURIComponent('Tu turno fue reservado exitosamente.'));
     } catch (error) {
         next(error);
     }
@@ -206,7 +105,6 @@ exports.cancelarMiTurno = async (req, res, next) => {
     try {
         const clienteId = req.session.usuario.id;
         const turnoId = req.params.id;
-
         const turno = await Turno.findOne({
             id: Number(turnoId),
             clienteId: Number(clienteId)
@@ -222,7 +120,7 @@ exports.cancelarMiTurno = async (req, res, next) => {
 
         turno.cancelar();
         await turno.save();
-        res.redirect('/mis-turnos?exito=El turno fue cancelado correctamente.');
+        res.redirect('/mis-turnos?exito=' + encodeURIComponent('El turno fue cancelado correctamente.'));
     } catch (error) {
         next(error);
     }

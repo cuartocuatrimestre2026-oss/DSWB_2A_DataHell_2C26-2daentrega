@@ -1,4 +1,6 @@
 const Sala = require('../models/Sala');
+const Turno = require('../models/Turno');
+const Contador = require('../models/Contador');
 
 exports.obtenerTodos = async (req, res, next) => {
     try {
@@ -35,15 +37,13 @@ exports.crear = async (req, res, next) => {
                 detalle: "Nombre y capacidadNormal numérica son obligatorios."
             });
         }
-        const ultimo = await Sala.findOne().sort({ id: -1 });
-        const nuevoId = (ultimo && ultimo.id) ? ultimo.id + 1 : 1;
 
+        const nuevoId = await Contador.obtenerSiguienteId('salas');
         const nuevaSala = await Sala.create({
             id: nuevoId,
             nombre: nombre.trim(),
             capacidadNormal: Number(capacidadNormal)
         });
-
         res.status(201).json({ mensaje: "Sala creada exitosamente", sala: nuevaSala });
     } catch (error) {
         next(error);
@@ -66,9 +66,23 @@ exports.actualizar = async (req, res, next) => {
     }
 };
 
+// Bloqueo de eliminación si tiene turnos activos.
 exports.eliminar = async (req, res, next) => {
     try {
-        const eliminado = await Sala.findOneAndDelete({ id: Number(req.params.id) });
+        const salaId = Number(req.params.id);
+        const turnosAsociados = await Turno.countDocuments({
+            salaId,
+            estado: 'reservado'
+        });
+
+        if (turnosAsociados > 0) {
+            return res.status(409).json({
+                error: "Conflicto de integridad",
+                detalle: `No se puede eliminar la sala porque cuenta con ${turnosAsociados} turno(s) reservado(s) activo(s).`
+            });
+        }
+
+        const eliminado = await Sala.findOneAndDelete({ id: salaId });
         if (!eliminado) {
             return res.status(404).json({ error: "No encontrado", detalle: "Sala no encontrada para eliminar." });
         }
