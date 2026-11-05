@@ -24,7 +24,12 @@ exports.obtenerPorId = async (req, res, next) => {
 
 exports.crear = async (req, res, next) => {
     try {
-        const { nombre, apellido, dni, email, telefono, password, rol, estado, aptoMedicoVigente, patologiasActivas } = req.body;
+        // La carga del apto es exclusiva del personal administrativo.
+        if (req.usuarioJWT.rol !== 'empleado' && (req.body.fechaEmisionApto !== undefined || req.body.fechaVencimientoApto !== undefined)) {
+            return res.status(403).json({ error: "Acceso denegado", detalle: "Solo el personal administrativo puede cargar el apto." });
+        }
+
+        const { nombre, apellido, dni, email, telefono, password, rol, estado, fechaEmisionApto, fechaVencimientoApto, patologiasActivas } = req.body;
         if (!nombre || !apellido || !dni || !email) {
             return res.status(400).json({ error: "Datos incompletos", detalle: "Nombre, apellido, DNI y email son obligatorios." });
         }
@@ -48,7 +53,8 @@ exports.crear = async (req, res, next) => {
             password: password ? password.trim() : '123456',
             rol: rol || 'cliente',
             estado: estado || 'activo',
-            aptoMedicoVigente: aptoMedicoVigente !== undefined ? aptoMedicoVigente : true,
+            fechaEmisionApto,
+            fechaVencimientoApto,
             patologiasActivas: patologiasActivas ? patologiasActivas.trim() : ''
         });
 
@@ -57,12 +63,18 @@ exports.crear = async (req, res, next) => {
 
         res.status(201).json({ mensaje: "Cliente creado exitosamente", cliente: clienteRespuesta });
     } catch (error) {
+        if (error.name === 'ValidationError') error.status = 400;
         next(error);
     }
 };
 
 exports.actualizar = async (req, res, next) => {
     try {
+        // La carga del apto es exclusiva del personal administrativo.
+        if (req.usuarioJWT.rol !== 'empleado' && (req.body.fechaEmisionApto !== undefined || req.body.fechaVencimientoApto !== undefined)) {
+            return res.status(403).json({ error: "Acceso denegado", detalle: "Solo el personal administrativo puede cargar el apto." });
+        }
+
         // Bloqueo de escalada de privilegios.
         const datosPermitidos = { ...req.body };
         delete datosPermitidos.rol;
@@ -81,6 +93,8 @@ exports.actualizar = async (req, res, next) => {
         }
 
         Object.assign(cliente, datosPermitidos);
+        // Un vencimiento informado se respeta aunque coincida con el guardado.
+        if (datosPermitidos.fechaVencimientoApto) cliente.markModified('fechaVencimientoApto');
         await cliente.save();
 
         const clienteRespuesta = cliente.toObject();
@@ -88,6 +102,7 @@ exports.actualizar = async (req, res, next) => {
 
         res.status(200).json(clienteRespuesta);
     } catch (error) {
+        if (error.name === 'ValidationError') error.status = 400;
         next(error);
     }
 };
@@ -109,6 +124,50 @@ exports.eliminar = async (req, res, next) => {
             cliente 
         });
     } catch (error) {
+        next(error);
+    }
+};
+
+// Pantalla de carga del apto físico para el personal administrativo.
+exports.mostrarAptoFisicoWeb = async (req, res, next) => {
+    try {
+        const socios = await Cliente.find({ rol: 'cliente', estado: { $ne: 'inactivo' } }).sort({ apellido: 1, nombre: 1 });
+        res.render('apto-fisico', {
+            socios,
+            errorApto: req.query.errorApto || null,
+            exitoApto: req.query.exitoApto || null
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Guarda el apto físico cargado desde la pantalla web.
+exports.cargarAptoFisicoWeb = async (req, res, next) => {
+    try {
+        const { clienteId, fechaEmisionApto, fechaVencimientoApto } = req.body;
+        if (!fechaEmisionApto) {
+            return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('La fecha de emisión del apto es obligatoria.'));
+        }
+
+        const cliente = await Cliente.findOne({ id: Number(clienteId) || 0, rol: 'cliente', estado: { $ne: 'inactivo' } });
+        if (!cliente) {
+            return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('Debe seleccionar un socio activo.'));
+        }
+
+        cliente.fechaEmisionApto = fechaEmisionApto;
+        cliente.fechaVencimientoApto = fechaVencimientoApto || null;
+        // Un vencimiento informado se respeta aunque coincida con el guardado.
+        if (fechaVencimientoApto) cliente.markModified('fechaVencimientoApto');
+        await cliente.save();
+
+        res.redirect('/vista/apto-fisico?exitoApto=' + encodeURIComponent(
+            `Apto de ${cliente.apellido}, ${cliente.nombre} cargado. Vence el ${cliente.fechaVencimientoApto.toLocaleDateString('es-AR', { timeZone: 'UTC' })}.`
+        ));
+    } catch (error) {
+        if (error.name === 'ValidationError') {
+            return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent(Object.values(error.errors)[0].message));
+        }
         next(error);
     }
 };

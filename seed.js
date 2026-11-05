@@ -46,7 +46,7 @@ async function inicializarBaseDeDatos() {
             ...c,
             password: passHasheada,
             rol: 'cliente',
-            aptoMedicoVigente: true,
+            fechaEmisionApto: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }),
             patologiasActivas: c.id === 1 ? 'Precaución: Lesión Lumbar L4-L5' : ''
         }));
         await Cliente.insertMany(clientesParaInsertar);
@@ -68,8 +68,7 @@ async function inicializarBaseDeDatos() {
             telefono: '1140009999',
             password: passAdminHasheada,
             rol: 'empleado',
-            estado: 'activo',
-            aptoMedicoVigente: true
+            estado: 'activo'
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
     );

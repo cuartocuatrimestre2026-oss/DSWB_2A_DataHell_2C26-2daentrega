@@ -1,0 +1,60 @@
+extends layouts/main
+
+block contenido
+  .encabezado-seccion
+    h2 Apto Físico de Socios
+    p Carga del certificado por el personal administrativo. La emisión no puede ser futura ni tener más de 7 días de antigüedad. Si no se indica vencimiento, se fija al año de la emisión.
+
+  if errorApto
+    .alerta.alerta-error
+      strong Error:
+      span= errorApto
+  if exitoApto
+    .alerta.alerta-exito
+      span= exitoApto
+
+  .formulario-tarjeta
+    h3 Cargar apto
+    form(action="/vista/apto-fisico", method="POST", class="form-estilizado")
+      .grupo-campo
+        label(for="clienteId") Socio / Paciente:
+        select#clienteId(name="clienteId", required)
+          option(value="") -- Seleccionar socio --
+          each c in socios
+            option(value=c.id)= `${c.apellido}, ${c.nombre} - DNI ${c.dni}`
+      .fila-campos
+        .grupo-campo
+          label(for="fechaEmisionApto") Fecha de emisión:
+          input#fechaEmisionApto(type="date", name="fechaEmisionApto", required)
+        .grupo-campo
+          label(for="fechaVencimientoApto") Fecha de vencimiento (opcional):
+          input#fechaVencimientoApto(type="date", name="fechaVencimientoApto")
+      button.btn-primario(type="submit") Guardar apto
+
+  table.tabla-turnos
+    thead
+      tr
+        th Apellido y Nombre
+        th DNI
+        th Emisión
+        th Vencimiento
+        th Estado
+    tbody
+      if socios.length
+        each c in socios
+          tr
+            td
+              strong= `${c.apellido}, ${c.nombre}`
+            td= c.dni
+            td= c.fechaEmisionApto ? c.fechaEmisionApto.toLocaleDateString('es-AR', { timeZone: 'UTC' }) : '-'
+            td= c.fechaVencimientoApto ? c.fechaVencimientoApto.toLocaleDateString('es-AR', { timeZone: 'UTC' }) : '-'
+            td
+              if c.aptoMedicoVigente
+                span.badge.badge-atendido Apto al día
+              else if c.fechaVencimientoApto
+                span.badge.badge-cancelado Vencido
+              else
+                span.badge.badge-cancelado Apto Pendiente
+      else
+        tr
+          td(colspan="5") No se registran socios activos.
