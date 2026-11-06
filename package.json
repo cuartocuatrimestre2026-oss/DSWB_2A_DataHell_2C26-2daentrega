@@ -22,7 +22,9 @@
     "jwt",
     "bcrypt",
     "atlas",
-    "render"
+    "render",
+    "websockets",
+    "socket.io"
   ],
   "author": "Grupo 16 - DataHell",
   "license": "ISC",
@@ -34,7 +36,8 @@
     "express-session": "^1.19.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.11.1",
-    "pug": "^3.0.4"
+    "pug": "^3.0.4",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

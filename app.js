@@ -1,12 +1,16 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
 const path = require('path');
 const session = require('express-session');
+const { Server } = require('socket.io');
+
 const connectDB = require('./config/db');
 const inicializarBaseDeDatos = require('./seed');
 const loggerMiddleware = require('./middlewares/loggerMiddleware');
 const manejoErroresMiddleware = require('./middlewares/manejoErroresMiddleware');
 const { estaAutenticado, esEmpleado } = require('./middlewares/authMiddleware');
+const inicializarSockets = require('./sockets/chat.socket');
 
 // Rutas modulares
 const authRoutes = require('./routes/auth.routes');
@@ -25,6 +29,9 @@ const Servicio = require('./models/Servicio');
 const turnosController = require('./controllers/turnos.controller');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
 const PORT = process.env.PORT || 3000;
 
 // Middlewares base
@@ -33,9 +40,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(loggerMiddleware);
 app.set('trust proxy', 1);
 
-// Sesiones de usuario
+// Configuración de sesiones
 const secretoSesion = process.env.SESSION_SECRET;
-app.use(session({
+const middlewareSesion = session({
     secret: secretoSesion,
     resave: false,
     saveUninitialized: false,
@@ -45,7 +52,17 @@ app.use(session({
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax'
     }
-}));
+});
+
+app.use(middlewareSesion);
+
+// Compartir sesión con Socket.io
+io.engine.use((req, res, next) => {
+    middlewareSesion(req, res, next);
+});
+
+// Inicialización de sockets
+inicializarSockets(io);
 
 // Disponibilidad del usuario logueado en plantillas Pug
 app.use((req, res, next) => {
@@ -243,13 +260,13 @@ app.use((req, res) => {
 // Middleware centralizado de errores
 app.use(manejoErroresMiddleware);
 
-// Inicio del servidor: SIEMPRE debe iniciar y escuchar.
+// Inicio del servidor HTTP con WebSockets
 async function iniciarServidor() {
     try {
         await connectDB();
         await inicializarBaseDeDatos();
-        app.listen(PORT, () => {
-            console.log(`Servidor TurnoFlex iniciado exitosamente en: http://localhost:${PORT}`);
+        server.listen(PORT, () => {
+            console.log(`Servidor TurnoFlex (HTTP + WebSockets) iniciado exitosamente en: http://localhost:${PORT}`);
         });
     } catch (error) {
         console.error('Error al iniciar el servidor:', error.message);

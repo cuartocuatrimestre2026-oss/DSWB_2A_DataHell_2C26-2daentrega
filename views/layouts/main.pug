@@ -30,7 +30,21 @@ html(lang="es")
           a.btn-nav-registro(href="/registro") Registrarse
     main.container
       block contenido
+
+    // Widget Flotante del Asistente Virtual WebSockets.
+    #chat-widget-boton.chat-boton-flotante(title="Consultar Asistente TurnoBot") 💬 Asistente Virtual
+    #chat-widget-ventana.chat-ventana.oculto
+      .chat-header
+        span.chat-titulo 🤖 TurnoBot - Espacio Sideral
+        button#chat-btn-cerrar.chat-btn-cerrar(type="button") ✕
+      #chat-mensajes.chat-cuerpo
+      form#chat-form.chat-footer
+        input#chat-input(type="text", placeholder="Consultá sobre clases, apto, salas...", autocomplete="off", required)
+        button.btn-chat-enviar(type="submit") Enviar
+
     footer.footer
       p IFTS N° 29 - Desarrollo Web Backend | Grupo 16 - DataHell (Comisión A)
-      p Persistencia NoSQL con MongoDB Atlas y Mongoose.
+      p Persistencia NoSQL con MongoDB Atlas, Mongoose y WebSockets en tiempo real.
+    
+    script(src="/socket.io/socket.io.js")
     script(src="/js/main.js")
