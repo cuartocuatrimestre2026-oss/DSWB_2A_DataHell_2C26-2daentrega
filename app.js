@@ -22,9 +22,7 @@ const Turno = require('./models/Turno');
 const Cliente = require('./models/Cliente');
 const Sala = require('./models/Sala');
 const Servicio = require('./models/Servicio');
-const Instructor = require('./models/Instructor');
 const turnosController = require('./controllers/turnos.controller');
-const clientesController = require('./controllers/clientes.controller');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -91,20 +89,13 @@ app.get('/', async (req, res, next) => {
 
 app.get('/vista/turnos', estaAutenticado, esEmpleado, async (req, res, next) => {
     try {
-        const [turnos, clientes, salas, servicios, instructores] = await Promise.all([
+        const [turnos, clientes, salas] = await Promise.all([
             Turno.find().sort({ fechaHora: 1 }),
-            Cliente.find().sort({ apellido: 1, nombre: 1 }),
-            Sala.find().sort({ id: 1 }),
-            Servicio.find().sort({ id: 1 }),
-            Instructor.find().sort({ apellido: 1, nombre: 1 })
+            Cliente.find(),
+            Sala.find()
         ]);
         const clientesMap = new Map(clientes.map(c => [Number(c.id), c]));
         const salasMap = new Map(salas.map(s => [Number(s.id), s.nombre]));
-        const serviciosMap = new Map(servicios.map(s => [Number(s.id), s.nombre]));
-        const instructoresMap = new Map(instructores.map(i => [Number(i.id), `${i.nombre} ${i.apellido}`]));
-
-        // Socios que recepción puede elegir en el formulario de sobreturno.
-        const socios = clientes.filter(c => c.rol === 'cliente' && c.estado === 'activo');
 
         const turnosMapeados = turnos.map(t => {
             const clienteObj = clientesMap.get(Number(t.clienteId));
@@ -114,8 +105,6 @@ app.get('/vista/turnos', estaAutenticado, esEmpleado, async (req, res, next) => 
                 clienteDetalle: clienteObj ? `${clienteObj.apellido}, ${clienteObj.nombre} (DNI ${clienteObj.dni})` : `Socio #${t.clienteId}`,
                 aptoMedicoVigente: clienteObj ? clienteObj.aptoMedicoVigente : true,
                 patologiasActivas: clienteObj ? clienteObj.patologiasActivas : '',
-                servicioDetalle: serviciosMap.get(Number(t.servicioId)) || `Servicio #${t.servicioId}`,
-                instructorDetalle: instructoresMap.get(Number(t.instructorId)) || `Instructor #${t.instructorId}`,
                 salaId: t.salaId,
                 salaDetalle: salasMap.get(Number(t.salaId)) || `Sala #${t.salaId}`,
                 fechaHora: t.fechaHora,
@@ -127,10 +116,6 @@ app.get('/vista/turnos', estaAutenticado, esEmpleado, async (req, res, next) => 
 
         res.render('turnos', {
             turnos: turnosMapeados,
-            socios,
-            servicios,
-            instructores,
-            salas,
             errorSobreturno: req.query.errorSobreturno || null
         });
     } catch (error) {
@@ -150,9 +135,6 @@ app.get('/vista/clientes', estaAutenticado, esEmpleado, async (req, res, next) =
         next(error);
     }
 });
-
-app.get('/vista/apto-fisico', estaAutenticado, esEmpleado, clientesController.mostrarAptoFisicoWeb);
-app.post('/vista/apto-fisico', estaAutenticado, esEmpleado, clientesController.cargarAptoFisicoWeb);
 
 // Manejo de recursos no encontrados (404) con detección estricta de rutas API.
 app.use((req, res) => {

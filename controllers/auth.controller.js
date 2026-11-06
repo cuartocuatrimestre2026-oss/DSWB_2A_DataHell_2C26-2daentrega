@@ -185,6 +185,7 @@ exports.procesarRegistro = async (req, res, next) => {
             password: password.trim(),
             rol: 'cliente',
             estado: 'activo',
+            aptoMedicoVigente: true,
             patologiasActivas: ''
         });
 

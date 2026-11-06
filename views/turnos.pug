@@ -22,30 +22,18 @@ block contenido
       form(action="/vista/turnos/sobreturno", method="POST", class="form-estilizado")
         .fila-campos
           .grupo-campo
-            label(for="clienteId") Socio / Paciente:
-            select#clienteId(name="clienteId", required)
-              option(value="") -- Seleccionar socio --
-              each c in socios
-                option(value=c.id)= `${c.apellido}, ${c.nombre} - DNI ${c.dni}${c.aptoMedicoVigente ? '' : ' (apto vencido)'}`
+            label(for="clienteId") ID Socio / Paciente:
+            input#clienteId(type="number", name="clienteId", placeholder="Ej: 1", required)
           .grupo-campo
-            label(for="servicioId") Actividad / Disciplina:
-            select#servicioId(name="servicioId", required)
-              option(value="") -- Seleccionar actividad --
-              each s in servicios
-                option(value=s.id)= `${s.nombre} (${s.modalidad}) - Duración: ${s.duracionMinutos} min`
+            label(for="servicioId") ID Disciplina:
+            input#servicioId(type="number", name="servicioId", placeholder="Ej: 1", required)
         .fila-campos
           .grupo-campo
-            label(for="instructorId") Instructor / Docente:
-            select#instructorId(name="instructorId", required)
-              option(value="") -- Seleccionar docente --
-              each i in instructores
-                option(value=i.id)= `${i.apellido}, ${i.nombre} - Especialidad: ${i.especialidad}`
+            label(for="instructorId") ID Docente:
+            input#instructorId(type="number", name="instructorId", placeholder="Ej: 1", required)
           .grupo-campo
-            label(for="salaId") Sala / Espacio Físico:
-            select#salaId(name="salaId", required)
-              option(value="") -- Seleccionar sala --
-              each sala in salas
-                option(value=sala.id)= `${sala.nombre} (Capacidad estándar: ${sala.capacidadNormal} personas)`
+            label(for="salaId") ID Sala:
+            input#salaId(type="number", name="salaId", placeholder="Ej: 1", required)
         .fila-campos
           .grupo-campo
             label(for="fechaHora") Fecha y Hora:
@@ -61,8 +49,6 @@ block contenido
         th ID Turno
         th Socio / Cliente
         th Apto Físico / Alerta Postural
-        th Disciplina
-        th Docente
         th Sala
         th Fecha y Hora
         th Estado
@@ -83,8 +69,6 @@ block contenido
                 span.badge.badge-cancelado Vencido
               if t.patologiasActivas
                 span.badge.badge-sobreturno ⚠️ #{t.patologiasActivas}
-            td= t.servicioDetalle
-            td= t.instructorDetalle
             td= t.salaDetalle || `Sala #${t.salaId}`
             td= new Date(t.fechaHora).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })
             td
@@ -112,4 +96,4 @@ block contenido
                 span.texto-apagado -
       else
         tr
-          td(colspan="10") No se registran turnos en la base de datos de MongoDB.
+          td(colspan="8") No se registran turnos en la base de datos de MongoDB.

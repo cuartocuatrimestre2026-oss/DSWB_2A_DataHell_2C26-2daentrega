@@ -6,6 +6,3 @@ node_modules/
 .vscode/
 dist/
 build/
-pruebas/
-*.xlsx
-*.docx
