@@ -28,6 +28,22 @@
 
 ---
 
+## Nuevas Funcionalidades: WebSockets & IA (Entrega Final)
+
+### 💬 Asistente Virtual y Buscador Inteligente en Tiempo Real (M12)
+Se ha integrado un Asistente Virtual en tiempo real (`TurnoBot`) utilizando **Socket.io** sobre el servidor HTTP de Express, que se encuentra accesible en la esquina inferior derecha de todas las pantallas de la aplicación.
+
+* **Buscador de Base de Datos:** Los usuarios pueden consultar en lenguaje natural sobre las disciplinas, horarios y salas disponibles (ej. *"¿Qué disciplinas hay?"*, *"¿Cuáles son las salas?"*). El bot realiza búsquedas en caliente directamente sobre la base de datos de MongoDB.
+* **Asistente de Negocio:** El bot está precargado con las reglas operativas de Espacio Sideral (ej. *"¿Puedo sacar sobreturno en Pilates?"*, *"¿Cuándo vence mi apto?"*, *"¿Cómo funciona el sobreturno?"*).
+* **IA & Resiliencia (Fallback):** El backend está preparado para conectarse a la API de **Google Gemini**. Sin embargo, en caso de fallas de conexión o ausencia de la API Key en el entorno de despliegue, cuenta con un robusto motor de contingencia (*fallback*) local que garantiza respuestas coherentes de negocio de forma inmediata y sin caídas del servidor.
+
+### 🛠 Pruebas de WebSockets en Desarrollo
+1. Iniciá la aplicación en modo desarrollo: `npm run dev` o en producción con `npm start`.
+2. Abrí múltiples pestañas o navegadores independientes en `http://localhost:3000`.
+3. Podrás interactuar con el widget y ver cómo los mensajes del socket se emiten e interactúan con la sesión del usuario conectado en tiempo real.
+
+---
+
 ## Puesta en Marcha
 
 ### 1. Clonar el repositorio
