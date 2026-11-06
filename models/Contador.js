@@ -16,7 +16,7 @@ contadorSchema.statics.obtenerSiguienteId = async function(nombreSecuencia) {
     const contador = await this.findOneAndUpdate(
         { id: nombreSecuencia },
         { $inc: { secuencia: 1 } },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
+        { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
     );
     return contador.secuencia;
 };

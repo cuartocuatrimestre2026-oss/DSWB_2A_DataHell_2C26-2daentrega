@@ -11,11 +11,24 @@ function parsearFechaHoraLocal(fechaStr, horaStr) {
     if (horaStr) {
         return new Date(`${fechaStr}T${horaStr}:00.000-03:00`);
     }
-    // Si viene ISO o datetime-local sin zona.
     if (fechaStr.includes('T') && !fechaStr.endsWith('Z') && !fechaStr.includes('-03:00')) {
         return new Date(`${fechaStr}:00.000-03:00`);
     }
     return new Date(fechaStr);
+}
+
+// Comprueba dinámicamente si el socio tiene el apto vigente hoy.
+function esAptoVigente(cliente) {
+    if (!cliente) return false;
+    if (cliente.aptoMedicoVigente === false) return false;
+    if (cliente.fechaVencimientoApto) {
+        const zona = { timeZone: 'America/Argentina/Buenos_Aires' };
+        const hoyStr = new Date().toLocaleDateString('en-CA', zona);
+        const hoyUTC = new Date(`${hoyStr}T00:00:00.000Z`);
+        const vencUTC = new Date(cliente.fechaVencimientoApto);
+        return vencUTC.getTime() >= hoyUTC.getTime();
+    }
+    return cliente.aptoMedicoVigente === true;
 }
 
 // Servicio centralizado para Alta de Turno Regular.
@@ -51,8 +64,21 @@ async function crearTurnoRegularDominio({ clienteId, servicioId, instructorId, s
         };
     }
 
+    // Coherencia Instructor - Especialidad / Servicio.
+    if (instructor.especialidad && servicio.nombre) {
+        const espInst = instructor.especialidad.trim().toLowerCase();
+        const nomServ = servicio.nombre.trim().toLowerCase();
+        if (espInst !== nomServ && !nomServ.includes(espInst) && !espInst.includes(nomServ)) {
+            return {
+                error: true,
+                status: 400,
+                mensaje: `El instructor ${instructor.nombre} ${instructor.apellido} posee especialidad en '${instructor.especialidad}' y no puede impartir '${servicio.nombre}'.`
+            };
+        }
+    }
+
     // Validación de Apto Médico.
-    if (cliente.aptoMedicoVigente === false) {
+    if (!esAptoVigente(cliente)) {
         return { 
             error: true, 
             status: 403, 
@@ -60,18 +86,26 @@ async function crearTurnoRegularDominio({ clienteId, servicioId, instructorId, s
         };
     }
 
-    // Verificación de doble reserva del cliente en la misma franja.
+    // Verificación de doble reserva del cliente en la misma franja horaria.
     const duracionMs = (servicio.duracionMinutos || 60) * 60 * 1000;
     const inicioTurno = fechaHoraObj.getTime();
     const finTurno = inicioTurno + duracionMs;
 
-    const clienteSuperpuesto = await Turno.findOne({
+    const turnosCliente = await Turno.find({
         clienteId: Number(clienteId),
-        estado: 'reservado',
-        fechaHora: { $gte: new Date(inicioTurno - duracionMs + 1000), $lt: new Date(finTurno) }
+        estado: 'reservado'
     });
-    if (clienteSuperpuesto) {
-        return { error: true, status: 409, mensaje: 'El socio ya cuenta con otra reserva en dicho horario.' };
+
+    for (const t of turnosCliente) {
+        const srvExistente = await Servicio.findOne({ id: t.servicioId });
+        const durExistenteMs = (srvExistente ? srvExistente.duracionMinutos : 60) * 60 * 1000;
+        const inicioExistente = new Date(t.fechaHora).getTime();
+        const finExistente = inicioExistente + durExistenteMs;
+
+        // Se solapa si el inicio de uno es menor al fin del otro y viceversa.
+        if (inicioTurno < finExistente && finTurno > inicioExistente) {
+            return { error: true, status: 409, mensaje: 'El socio ya cuenta con otra reserva superpuesta en dicha franja horaria.' };
+        }
     }
 
     // Verificación de disponibilidad del instructor.
@@ -84,6 +118,7 @@ async function crearTurnoRegularDominio({ clienteId, servicioId, instructorId, s
             { servicioId: { $ne: Number(servicioId) } }
         ]
     });
+
     if (instructorConflicto) {
         return { 
             error: true, 
@@ -136,13 +171,36 @@ async function crearSobreturnoDominio({ clienteId, servicioId, instructorId, sal
         return { error: true, status: 400, mensaje: 'La fecha y hora del sobreturno no es válida.' };
     }
 
-    const [cliente, sala] = await Promise.all([
+    const [cliente, servicio, instructor, sala] = await Promise.all([
         Cliente.findOne({ id: Number(clienteId) }),
+        Servicio.findOne({ id: Number(servicioId) }),
+        Instructor.findOne({ id: Number(instructorId) }),
         Sala.findOne({ id: Number(salaId) })
     ]);
 
     if (!cliente) return { error: true, status: 404, mensaje: 'El cliente especificado no existe.' };
+    if (!servicio) return { error: true, status: 404, mensaje: 'El servicio especificado no existe.' };
+    if (!instructor) return { error: true, status: 404, mensaje: 'El instructor especificado no existe.' };
     if (!sala) return { error: true, status: 404, mensaje: 'La sala especificada no existe.' };
+
+    // Coherencia servicio - sala.
+    if (Number(servicio.salaRequerida) !== Number(sala.id)) {
+        return { error: true, status: 400, mensaje: `La disciplina '${servicio.nombre}' solo puede dictarse en la sala asignada (#${servicio.salaRequerida}).` };
+    }
+
+    // Coherencia instructor - especialidad.
+    if (instructor.especialidad && servicio.nombre) {
+        const espInst = instructor.especialidad.trim().toLowerCase();
+        const nomServ = servicio.nombre.trim().toLowerCase();
+        if (espInst !== nomServ && !nomServ.includes(espInst) && !espInst.includes(nomServ)) {
+            return { error: true, status: 400, mensaje: `El instructor no cuenta con especialidad en '${servicio.nombre}'.` };
+        }
+    }
+
+    // Validación de Apto Médico.
+    if (!esAptoVigente(cliente)) {
+        return { error: true, status: 403, mensaje: 'El socio cuenta con el certificado de Apto Médico vencido o no presentado.' };
+    }
 
     // No permite sobreturno si el aforo regular NO está completo.
     const reservasRegulares = await Turno.countDocuments({
@@ -166,6 +224,7 @@ async function crearSobreturnoDominio({ clienteId, servicioId, instructorId, sal
         fechaHora: fechaHoraObj,
         estado: 'reservado'
     });
+
     if (clienteSuperpuesto) {
         return { error: true, status: 409, mensaje: 'El cliente ya cuenta con un turno reservado para esa fecha y horario.' };
     }

@@ -8,7 +8,7 @@ const loggerMiddleware = require('./middlewares/loggerMiddleware');
 const manejoErroresMiddleware = require('./middlewares/manejoErroresMiddleware');
 const { estaAutenticado, esEmpleado } = require('./middlewares/authMiddleware');
 
-// Rutas modulares.
+// Rutas modulares
 const authRoutes = require('./routes/auth.routes');
 const pacienteRoutes = require('./routes/paciente.routes');
 const turnosRoutes = require('./routes/turnos.routes');
@@ -17,7 +17,7 @@ const serviciosRoutes = require('./routes/servicios.routes');
 const instructoresRoutes = require('./routes/instructores.routes');
 const salasRoutes = require('./routes/salas.routes');
 
-// Modelos y controladores.
+// Modelos y controladores
 const Turno = require('./models/Turno');
 const Cliente = require('./models/Cliente');
 const Sala = require('./models/Sala');
@@ -27,47 +27,49 @@ const turnosController = require('./controllers/turnos.controller');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middlewares base.
+// Middlewares base
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(loggerMiddleware);
 app.set('trust proxy', 1);
 
-// Sesiones de usuario con soporte condicional para secure en producción.
+// Sesiones de usuario
+const secretoSesion = process.env.SESSION_SECRET;
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'turnoflex_super_secreto_session_2026',
+    secret: secretoSesion,
     resave: false,
     saveUninitialized: false,
     cookie: {
         maxAge: 1000 * 60 * 60 * 24, // 24 horas
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production'
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
     }
 }));
 
-// Disponibilidad del usuario logueado en plantillas Pug.
+// Disponibilidad del usuario logueado en plantillas Pug
 app.use((req, res, next) => {
     res.locals.usuarioActual = (req.session && req.session.usuario) ? req.session.usuario : null;
     next();
 });
 
-// Recursos estáticos y vistas Pug.
+// Recursos estáticos y vistas Pug
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
 
-// Rutas web de autenticación y portal de socios.
+// Rutas web de autenticación y portal de socios
 app.use('/', authRoutes);
 app.use('/', pacienteRoutes);
 
-// Rutas de la API REST.
+// Rutas de la API REST
 app.use('/turnos', turnosRoutes);
 app.use('/clientes', clientesRoutes);
 app.use('/servicios', serviciosRoutes);
 app.use('/instructores', instructoresRoutes);
 app.use('/salas', salasRoutes);
 
-// Vistas Server-Side para Administración y Recepción.
+// Vistas Server-Side para Administración y Recepción
 app.get('/', async (req, res, next) => {
     try {
         const [totalTurnos, totalClientes, totalSalas, totalServicios] = await Promise.all([
@@ -127,6 +129,85 @@ app.post('/vista/turnos/atender/:id', estaAutenticado, esEmpleado, turnosControl
 app.post('/vista/turnos/cancelar/:id', estaAutenticado, esEmpleado, turnosController.cancelarWeb);
 app.post('/vista/turnos/sobreturno', estaAutenticado, esEmpleado, turnosController.crearSobreturnoWeb);
 
+// Pantalla y procesamiento de Apto Físico para Recepción
+app.get('/vista/apto-fisico', estaAutenticado, esEmpleado, async (req, res, next) => {
+    try {
+        const socios = await Cliente.find({ rol: 'cliente', estado: 'activo' }).sort({ apellido: 1, nombre: 1 });
+        
+        const zona = { timeZone: 'America/Argentina/Buenos_Aires' };
+        const hoyStr = new Date().toLocaleDateString('en-CA', zona);
+        const hoyUTC = new Date(`${hoyStr}T00:00:00.000Z`);
+
+        const sociosMapeados = socios.map(s => {
+            const obj = s.toObject();
+            if (obj.fechaVencimientoApto) {
+                const vencUTC = new Date(obj.fechaVencimientoApto);
+                obj.aptoMedicoVigente = vencUTC.getTime() >= hoyUTC.getTime();
+            } else {
+                obj.aptoMedicoVigente = false;
+            }
+            return obj;
+        });
+
+        res.render('apto-fisico', {
+            socios: sociosMapeados,
+            errorApto: req.query.errorApto || null,
+            exitoApto: req.query.exitoApto || null
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.post('/vista/apto-fisico', estaAutenticado, esEmpleado, async (req, res, next) => {
+    try {
+        const { clienteId, fechaEmisionApto, fechaVencimientoApto } = req.body;
+        if (!clienteId || !fechaEmisionApto) {
+            return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('El socio y la fecha de emisión son obligatorios.'));
+        }
+
+        const cliente = await Cliente.findOne({ id: Number(clienteId) });
+        if (!cliente) {
+            return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('El socio seleccionado no existe.'));
+        }
+
+        const zona = { timeZone: 'America/Argentina/Buenos_Aires' };
+        const hoyStr = new Date().toLocaleDateString('en-CA', zona);
+        const hoyUTC = new Date(`${hoyStr}T00:00:00.000Z`);
+        const emisionUTC = new Date(`${fechaEmisionApto.split('T')[0]}T00:00:00.000Z`);
+
+        if (emisionUTC.getTime() > hoyUTC.getTime()) {
+            return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('La fecha de emisión no puede ser futura.'));
+        }
+
+        const hace7DiasUTC = new Date(hoyUTC.getTime() - 7 * 86400000);
+        if (emisionUTC.getTime() < hace7DiasUTC.getTime()) {
+            return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('El certificado de apto médico presentado tiene más de 7 días de emitido.'));
+        }
+
+        cliente.fechaEmisionApto = emisionUTC;
+
+        if (fechaVencimientoApto) {
+            const vencimientoUTC = new Date(`${fechaVencimientoApto.split('T')[0]}T00:00:00.000Z`);
+            if (vencimientoUTC.getTime() < emisionUTC.getTime()) {
+                return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('La fecha de vencimiento no puede ser anterior a la de emisión.'));
+            }
+            cliente.fechaVencimientoApto = vencimientoUTC;
+        } else {
+            const emisionStr = fechaEmisionApto.split('T')[0];
+            const anioSiguiente = Number(emisionStr.slice(0, 4)) + 1;
+            cliente.fechaVencimientoApto = new Date(`${anioSiguiente}${emisionStr.slice(4)}T00:00:00.000Z`);
+        }
+
+        cliente.aptoMedicoVigente = cliente.fechaVencimientoApto.getTime() >= hoyUTC.getTime();
+        await cliente.save();
+
+        res.redirect('/vista/apto-fisico?exitoApto=' + encodeURIComponent('Apto médico cargado exitosamente.'));
+    } catch (error) {
+        next(error);
+    }
+});
+
 app.get('/vista/clientes', estaAutenticado, esEmpleado, async (req, res, next) => {
     try {
         const clientes = await Cliente.find().sort({ id: 1 });
@@ -136,7 +217,7 @@ app.get('/vista/clientes', estaAutenticado, esEmpleado, async (req, res, next) =
     }
 });
 
-// Manejo de recursos no encontrados (404) con detección estricta de rutas API.
+// Manejo de recursos no encontrados (404)
 app.use((req, res) => {
     const esRutaApi = req.originalUrl.startsWith('/turnos') ||
                       req.originalUrl.startsWith('/clientes') ||
@@ -159,10 +240,10 @@ app.use((req, res) => {
     });
 });
 
-// Middleware centralizado de errores.
+// Middleware centralizado de errores
 app.use(manejoErroresMiddleware);
 
-// Inicio del servidor.
+// Inicio del servidor: SIEMPRE debe iniciar y escuchar.
 async function iniciarServidor() {
     try {
         await connectDB();
@@ -176,8 +257,6 @@ async function iniciarServidor() {
     }
 }
 
-if (process.env.NODE_ENV !== 'test') {
-    iniciarServidor();
-}
+iniciarServidor();
 
 module.exports = app;

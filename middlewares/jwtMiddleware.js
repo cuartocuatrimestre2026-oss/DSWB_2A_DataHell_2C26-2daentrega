@@ -12,7 +12,7 @@ function verificarJWT(req, res, next) {
 
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
     const secreto = process.env.JWT_SECRET;
-
+    
     if (!secreto) {
         return res.status(500).json({
             error: "Error de configuración",

@@ -7,7 +7,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test --test-concurrency=1 pruebas/*.test.js",
     "start": "node app.js",
     "dev": "nodemon app.js",
     "seed": "node seed.js"

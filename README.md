@@ -50,7 +50,7 @@ cp .env.example .env
 
 Verificar que el archivo .env contenga la cadena de conexión local y el puerto:
 PORT=3000
-MONGODB_URI=mongodb+srv://cuartocuatrimestre2026_db_user:qUtjKnV5tX3ldhez@cluster0.cfx59jp.mongodb.net/turnoflex?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://<USUARIO>:<PASSWORD>@<CLUSTER>.mongodb.net/turnoflex?retryWrites=true&w=majority
 SESSION_SECRET= [PASSWORD]
 JWT_SECRET= [PASSWORD]
 NODE_ENV=development

@@ -16,6 +16,7 @@ html(lang="es")
         if usuarioActual
           if usuarioActual.rol === 'empleado'
             a(href="/vista/turnos") Consola de Recepción
+            a(href="/vista/apto-fisico") Apto Físico
             a(href="/vista/clientes") Padrón General
             span.etiqueta-usuario Recepción: #{usuarioActual.nombre}
             a.btn-salir(href="/logout") Cerrar Sesión

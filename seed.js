@@ -7,7 +7,18 @@ const Instructor = require('./models/Instructor');
 const Sala = require('./models/Sala');
 const Servicio = require('./models/Servicio');
 const Turno = require('./models/Turno');
+const Contador = require('./models/Contador');
 const seedData = require('./seedData');
+
+async function sincronizarContador(nombreSecuencia, Modelo) {
+    const ultimo = await Modelo.findOne().sort({ id: -1 });
+    const maxId = ultimo && ultimo.id ? ultimo.id : 0;
+    await Contador.findOneAndUpdate(
+        { id: nombreSecuencia },
+        { $max: { secuencia: maxId } },
+        { upsert: true, returnDocument: 'after' }
+    );
+}
 
 async function inicializarBaseDeDatos() {
     console.log('[Seed] Verificando e inicializando base de datos en MongoDB...');
@@ -15,78 +26,110 @@ async function inicializarBaseDeDatos() {
         await connectDB();
     }
 
-    // Carga las Salas.
-    const totalSalas = await Sala.countDocuments();
-    if (totalSalas === 0) {
-        await Sala.insertMany(seedData.salas);
-        console.log(`[Seed] ${seedData.salas.length} salas insertadas.`);
+    // Carga de Salas.
+    for (const sala of seedData.salas) {
+        await Sala.findOneAndUpdate(
+            { id: sala.id },
+            { $setOnInsert: sala },
+            { upsert: true, returnDocument: 'after' }
+        );
+    }
+    await sincronizarContador('salas', Sala);
+
+    // Carga de Instructores.
+    for (const inst of seedData.instructores) {
+        await Instructor.findOneAndUpdate(
+            { id: inst.id },
+            { $setOnInsert: inst },
+            { upsert: true, returnDocument: 'after' }
+        );
+    }
+    await sincronizarContador('instructores', Instructor);
+
+    // Carga de Servicios.
+    for (const serv of seedData.servicios) {
+        await Servicio.findOneAndUpdate(
+            { id: serv.id },
+            { $setOnInsert: serv },
+            { upsert: true, returnDocument: 'after' }
+        );
+    }
+    await sincronizarContador('servicios', Servicio);
+
+    // Carga de Clientes iniciales con apto vigente.
+    const salt = await bcrypt.genSalt(10);
+    const passHasheada = await bcrypt.hash('123456', salt);
+    const ahora = new Date();
+    const emision = new Date(ahora.getTime() - 2 * 86400000); // 2 días atrás
+    const vencimiento = new Date(ahora.getTime() + 363 * 86400000); // ~1 año
+
+    for (const cli of seedData.clientes) {
+        await Cliente.findOneAndUpdate(
+            { id: cli.id },
+            {
+                $setOnInsert: {
+                    ...cli,
+                    password: passHasheada,
+                    rol: 'cliente',
+                    estado: 'activo',
+                    fechaEmisionApto: emision,
+                    fechaVencimientoApto: vencimiento,
+                    aptoMedicoVigente: true,
+                    patologiasActivas: cli.id === 1 ? 'Precaución: Lesión Lumbar L4-L5' : ''
+                }
+            },
+            { upsert: true, returnDocument: 'after' }
+        );
     }
 
-    // Carga los Instructores.
-    const totalInstructores = await Instructor.countDocuments();
-    if (totalInstructores === 0) {
-        await Instructor.insertMany(seedData.instructores);
-        console.log(`[Seed] ${seedData.instructores.length} instructores insertados.`);
-    }
-
-    // Carga los Servicios.
-    const totalServicios = await Servicio.countDocuments();
-    if (totalServicios === 0) {
-        await Servicio.insertMany(seedData.servicios);
-        console.log(`[Seed] ${seedData.servicios.length} servicios insertados.`);
-    }
-
-    // Carga Clientes / Socios con contraseñas encriptadas con bcrypt.
-    const totalClientes = await Cliente.countDocuments();
-    if (totalClientes === 0) {
-        const salt = await bcrypt.genSalt(10);
-        const passHasheada = await bcrypt.hash('123456', salt);
-
-        const clientesParaInsertar = seedData.clientes.map(c => ({
-            ...c,
-            password: passHasheada,
-            rol: 'cliente',
-            aptoMedicoVigente: true,
-            patologiasActivas: c.id === 1 ? 'Precaución: Lesión Lumbar L4-L5' : ''
-        }));
-        await Cliente.insertMany(clientesParaInsertar);
-        console.log(`[Seed] ${clientesParaInsertar.length} clientes insertados con credenciales seguras.`);
-    }
-
-    // Garantiza usuario administrativo de recepción con contraseña encriptada.
+    // Usuario administrativo (admin@espaciosideral.com)
+    // $setOnInsert preserva la contraseña si un test la modificó durante la prueba.
     const saltAdmin = await bcrypt.genSalt(10);
     const passAdminHasheada = await bcrypt.hash('admin123', saltAdmin);
-
     await Cliente.findOneAndUpdate(
         { email: 'admin@espaciosideral.com' },
         {
-            id: 999,
-            nombre: 'Personal',
-            apellido: 'Recepción',
-            dni: '99999999',
-            email: 'admin@espaciosideral.com',
-            telefono: '1140009999',
-            password: passAdminHasheada,
-            rol: 'empleado',
-            estado: 'activo',
-            aptoMedicoVigente: true
+            $setOnInsert: {
+                id: 999,
+                nombre: 'Personal',
+                apellido: 'Recepción',
+                dni: '99999999',
+                email: 'admin@espaciosideral.com',
+                telefono: '1140009999',
+                password: passAdminHasheada,
+                rol: 'empleado',
+                estado: 'activo',
+                aptoMedicoVigente: true
+            }
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, returnDocument: 'after' }
     );
-    console.log('[Seed] Usuario administrativo (admin@espaciosideral.com) habilitado con hash bcrypt.');
 
-    // Carga Turnos.
-    const totalTurnos = await Turno.countDocuments();
-    if (totalTurnos === 0) {
-        const turnosParaInsertar = seedData.turnos.map(t => ({
-            ...t,
-            fechaHora: new Date(t.fechaHora)
-        }));
-        await Turno.insertMany(turnosParaInsertar);
-        console.log(`[Seed] ${turnosParaInsertar.length} turnos insertados.`);
+    // Sincronizar contador de clientes usando los IDs regulares.
+    const ultimoCliente = await Cliente.findOne({ id: { $lt: 900 } }).sort({ id: -1 });
+    const maxClienteId = ultimoCliente ? ultimoCliente.id : 5;
+    await Contador.findOneAndUpdate(
+        { id: 'clientes' },
+        { $max: { secuencia: maxClienteId } },
+        { upsert: true, returnDocument: 'after' }
+    );
+
+    // Carga de Turnos.
+    for (const t of seedData.turnos) {
+        await Turno.findOneAndUpdate(
+            { id: t.id },
+            {
+                $setOnInsert: {
+                    ...t,
+                    fechaHora: new Date(t.fechaHora)
+                }
+            },
+            { upsert: true, returnDocument: 'after' }
+        );
     }
+    await sincronizarContador('turnos', Turno);
 
-    console.log('[Seed] ¡Inicialización completada con éxito!');
+    console.log('[Seed] Base de datos sincronizada con éxito.');
 }
 
 if (require.main === module) {

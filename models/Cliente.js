@@ -44,7 +44,6 @@ const clienteSchema = new mongoose.Schema({
         enum: ['cliente', 'empleado'],
         default: 'cliente'
     },
-
     // Baja lógica sin borrado físico en la BD.
     estado: {
         type: String,
@@ -58,18 +57,24 @@ const clienteSchema = new mongoose.Schema({
             message: 'El estado "licencia" solo aplica al personal administrativo.'
         }
     },
-
-    // Apto Médico y Salud Postural.
+    // Control Sanitario de Apto Médico.
+    fechaEmisionApto: {
+        type: Date,
+        default: null
+    },
+    fechaVencimientoApto: {
+        type: Date,
+        default: null
+    },
     aptoMedicoVigente: {
         type: Boolean,
-        default: true
+        default: false
     },
     patologiasActivas: {
         type: String,
         trim: true,
         default: ''
     },
-
     // Seguridad y Mitigación de Fuerza Bruta.
     intentosFallidos: {
         type: Number,
@@ -87,7 +92,7 @@ const clienteSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Hashea la contraseña automáticamente si fue modificada.
+// Hook pre-save: Hashea la contraseña automáticamente si fue modificada.
 clienteSchema.pre('save', async function() {
     if (!this.isModified('password')) return;
     if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) return;
@@ -96,7 +101,7 @@ clienteSchema.pre('save', async function() {
     this.password = await bcrypt.hash(this.password.trim(), salt);
 });
 
-// Método de dominio para validar contraseña.
+// Método de dominio para validar contraseña
 clienteSchema.methods.compararPassword = async function(candidata) {
     if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) {
         return await bcrypt.compare(String(candidata).trim(), this.password);
