@@ -12,6 +12,10 @@ block contenido
     .alerta.alerta-exito
       strong ✅ ¡Operación exitosa! 
       span= mensajeExito
+  if mensajeError
+    .alerta.alerta-error
+      strong ⚠️ Atención: 
+      span= mensajeError
   table.tabla-turnos
     thead
       tr
@@ -44,8 +48,11 @@ block contenido
             td= t.esSobreturno ? 'SOBRETURNO' : 'REGULAR'
             td
               if t.estado === 'reservado'
-                form(action=`/mis-turnos/cancelar/${t.id}`, method="POST", data-confirm="¿Seguro que deseas cancelar esta reserva?")
-                  button.btn-peligro-chico(type="submit") Cancelar
+                if t.permiteCancelar
+                  form(action=`/mis-turnos/cancelar/${t.id}`, method="POST", data-confirm="¿Seguro que deseas cancelar esta reserva?")
+                    button.btn-peligro-chico(type="submit") Cancelar
+                else
+                  span.texto-apagado(title="Cancelación solo con 4 hs de anticipación") Bloqueado (< 4 hs)
               else
                 span.texto-apagado -
       else

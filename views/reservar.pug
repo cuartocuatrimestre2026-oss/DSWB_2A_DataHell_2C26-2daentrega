@@ -4,7 +4,7 @@ block contenido
   .formulario-contenedor
     .formulario-tarjeta
       h2 📅 Reservar Turno para Actividad
-      p.subtitulo Seleccioná la actividad deportiva, el docente a cargo y el horario de tu preferencia.
+      p.subtitulo Seleccioná la actividad deportiva, el docente a cargo y el horario habilitado en la grilla oficial.
       if error
         .alerta.alerta-error
           strong Error al reservar: 
@@ -33,8 +33,12 @@ block contenido
             label(for="fecha") Fecha:
             input#fecha(type="date", name="fecha", required)
           .grupo-campo
-            label(for="hora") Horario de Inicio:
-            input#hora(type="time", name="hora", required)
+            label(for="hora") Horario de Inicio (Grilla Oficial):
+            select#hora(name="hora", required)
+              option(value="") -- Seleccionar franja --
+              if franjasHorarias
+                each f in franjasHorarias
+                  option(value=f)= `${f} hs`
         button.btn-primario(type="submit") Confirmar Reserva Regular
       .enlace-secundario
         a.btn-volver(href="/mis-turnos") &larr; Volver a Mis Turnos

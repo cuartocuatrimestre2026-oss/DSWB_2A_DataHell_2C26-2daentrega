@@ -124,11 +124,16 @@ exports.generarTokenJWT = async (req, res, next) => {
             rol: usuario.rol
         };
 
-        const token = jwt.sign(payload, secreto, { expiresIn: '8h' });
+        // Vigencia diferenciada por perfil de seguridad:
+        // El personal administrativo posee permisos críticos sobre la base de datos (1h de vigencia).
+        // Los socios/clientes operan con perfil restringido (2h de vigencia).
+        const tiempoExpiracion = usuario.rol === 'empleado' ? '1h' : '2h';
+        const token = jwt.sign(payload, secreto, { expiresIn: tiempoExpiracion });
 
         res.status(200).json({
             mensaje: "Autenticación JWT exitosa",
             token,
+            expiracion: tiempoExpiracion,
             usuario: payload
         });
     } catch (error) {
@@ -172,7 +177,6 @@ exports.procesarRegistro = async (req, res, next) => {
             });
         }
 
-        // Generación del ID con Contador.
         const nuevoId = await Contador.obtenerSiguienteId('clientes');
 
         const nuevoCliente = await Cliente.create({
