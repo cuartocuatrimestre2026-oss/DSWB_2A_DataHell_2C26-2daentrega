@@ -1,226 +1,374 @@
 const Cliente = require('../models/Cliente');
 const Contador = require('../models/Contador');
 
-// Auxiliar para formatear fecha a medianoche UTC.
-function normalizarFechaUTC(fechaStr) {
-    if (!fechaStr) return null;
-    const str = String(fechaStr).split('T')[0];
-    return new Date(`${str}T00:00:00.000Z`);
+function calcularVencimientoDefecto(fechaEmision) {
+    const d = new Date(fechaEmision);
+    d.setUTCFullYear(d.getUTCFullYear() + 1);
+    return d;
 }
 
-// Auxiliar para calcular si el apto médico está vigente hoy en Argentina.
-function calcularVigenciaApto(fechaVencimiento) {
+function calcularAptoVigente(fechaVencimiento) {
     if (!fechaVencimiento) return false;
-    const zona = { timeZone: 'America/Argentina/Buenos_Aires' };
-    const hoyStr = new Date().toLocaleDateString('en-CA', zona);
-    const hoyUTC = new Date(`${hoyStr}T00:00:00.000Z`);
-    const vencUTC = new Date(fechaVencimiento);
-    // Vigente el día del vencimiento, vence al día siguiente.
-    return vencUTC.getTime() >= hoyUTC.getTime();
+    const v = new Date(fechaVencimiento);
+    const hoy = new Date();
+    return v.toISOString().slice(0, 10) >= hoy.toISOString().slice(0, 10);
 }
 
-exports.obtenerTodos = async (req, res, next) => {
+// GET /clientes (API).
+exports.listarClientes = async (req, res, next) => {
     try {
-        const clientes = await Cliente.find().sort({ id: 1 }).select('-password');
-        
-        // Actualiza dinámicamente la vigencia en base a la fecha actual.
-        const clientesConVigencia = clientes.map(c => {
+        const { estado, rol } = req.query;
+        const filtro = {};
+        if (estado) filtro.estado = estado;
+        if (rol) filtro.rol = rol;
+
+        const clientes = await Cliente.find(filtro).select('-password').sort({ id: 1 });
+        const resultado = clientes.map(c => {
             const obj = c.toObject();
-            if (obj.fechaVencimientoApto) {
-                obj.aptoMedicoVigente = calcularVigenciaApto(obj.fechaVencimientoApto);
-            }
+            obj.aptoMedicoVigente = calcularAptoVigente(obj.fechaVencimientoApto);
             return obj;
         });
-
-        res.status(200).json(clientesConVigencia);
+        res.status(200).json(resultado);
     } catch (error) {
         next(error);
     }
 };
 
-exports.obtenerPorId = async (req, res, next) => {
+// GET /clientes/:id (API).
+exports.obtenerClientePorId = async (req, res, next) => {
     try {
         const cliente = await Cliente.findOne({ id: Number(req.params.id) }).select('-password');
         if (!cliente) {
-            return res.status(404).json({ error: "No encontrado", detalle: "Cliente no registrado." });
+            return res.status(404).json({
+                error: 'Cliente no encontrado',
+                detalle: `No existe un usuario con el ID ${req.params.id}`
+            });
         }
-        
         const obj = cliente.toObject();
-        if (obj.fechaVencimientoApto) {
-            obj.aptoMedicoVigente = calcularVigenciaApto(obj.fechaVencimientoApto);
-        }
-        
+        obj.aptoMedicoVigente = calcularAptoVigente(obj.fechaVencimientoApto);
         res.status(200).json(obj);
     } catch (error) {
         next(error);
     }
 };
 
-exports.crear = async (req, res, next) => {
+// POST /clientes (API).
+exports.crearCliente = async (req, res, next) => {
     try {
-        const { nombre, apellido, dni, email, telefono, password, rol, estado, patologiasActivas } = req.body;
+        const { nombre, apellido, dni, email, telefono, password, rol, fechaEmisionApto, fechaVencimientoApto } = req.body;
+
         if (!nombre || !apellido || !dni || !email) {
-            return res.status(400).json({ error: "Datos incompletos", detalle: "Nombre, apellido, DNI y email son obligatorios." });
+            return res.status(400).json({
+                error: 'Datos incompletos',
+                detalle: 'nombre, apellido, dni y email son obligatorios.'
+            });
         }
 
         const existente = await Cliente.findOne({
-            $or: [{ email: email.toLowerCase().trim() }, { dni: dni.trim() }]
+            $or: [
+                { email: String(email).toLowerCase().trim() },
+                { dni: String(dni).trim() }
+            ]
         });
+
         if (existente) {
-            return res.status(409).json({ error: "Conflicto", detalle: "Ya existe un usuario con ese DNI o email." });
+            return res.status(409).json({
+                error: 'Conflicto de unicidad',
+                detalle: 'Ya existe un usuario con el mismo DNI o correo electrónico.'
+            });
+        }
+
+        const usuarioAutenticado = req.usuarioJWT || req.usuario || (req.session && req.session.usuario);
+        let rolAsignado = 'cliente';
+        if (rol === 'empleado' && usuarioAutenticado && usuarioAutenticado.rol === 'empleado') {
+            rolAsignado = 'empleado';
+        }
+
+        let fEmision = null;
+        let fVenc = null;
+        let aptoVigente = false;
+
+        if (fechaEmisionApto) {
+            fEmision = new Date(fechaEmisionApto);
+            const hoy = new Date();
+            if (fEmision > hoy) {
+                return res.status(400).json({ error: 'Fecha futura', detalle: 'La fecha de emisión no puede ser futura.' });
+            }
+            const diasAntiguedad = (hoy - fEmision) / (1000 * 60 * 60 * 24);
+            if (diasAntiguedad > 8) {
+                return res.status(400).json({ error: 'Emisión vencida', detalle: 'La emisión supera los 7 días reglamentarios.' });
+            }
+
+            if (fechaVencimientoApto) {
+                fVenc = new Date(fechaVencimientoApto);
+                if (fVenc < fEmision) {
+                    return res.status(400).json({ error: 'Fechas inconsistentes', detalle: 'El vencimiento no puede ser anterior a la emisión.' });
+                }
+            } else {
+                fVenc = calcularVencimientoDefecto(fEmision);
+            }
+            aptoVigente = calcularAptoVigente(fVenc);
         }
 
         const nuevoId = await Contador.obtenerSiguienteId('clientes');
 
         const nuevoCliente = await Cliente.create({
             id: nuevoId,
-            nombre: nombre.trim(),
-            apellido: apellido.trim(),
-            dni: dni.trim(),
-            email: email.toLowerCase().trim(),
-            telefono: telefono ? telefono.trim() : "",
-            password: password ? password.trim() : '123456',
-            rol: rol || 'cliente',
-            estado: estado || 'activo',
-            fechaEmisionApto: null,
-            fechaVencimientoApto: null,
-            aptoMedicoVigente: false,
-            patologiasActivas: patologiasActivas ? patologiasActivas.trim() : ''
+            nombre: String(nombre).trim(),
+            apellido: String(apellido).trim(),
+            dni: String(dni).trim(),
+            email: String(email).toLowerCase().trim(),
+            telefono: telefono ? String(telefono).trim() : '',
+            password: password ? String(password).trim() : '123456',
+            rol: rolAsignado,
+            estado: 'activo',
+            fechaEmisionApto: fEmision,
+            fechaVencimientoApto: fVenc,
+            aptoMedicoVigente: aptoVigente,
+            patologiasActivas: ''
         });
 
-        const clienteRespuesta = nuevoCliente.toObject();
-        delete clienteRespuesta.password;
+        const objCliente = nuevoCliente.toObject();
+        delete objCliente.password;
 
-        res.status(201).json({ mensaje: "Cliente creado exitosamente", cliente: clienteRespuesta });
+        res.status(201).json({
+            mensaje: 'Cliente registrado exitosamente',
+            cliente: objCliente,
+            ...objCliente
+        });
     } catch (error) {
         next(error);
     }
 };
 
-exports.actualizar = async (req, res, next) => {
+// PUT /clientes/:id (API).
+exports.actualizarCliente = async (req, res, next) => {
     try {
-        const clienteId = Number(req.params.id);
-        const cliente = await Cliente.findOne({ id: clienteId });
+        const cliente = await Cliente.findOne({ id: Number(req.params.id) });
         if (!cliente) {
-            return res.status(404).json({ error: "No encontrado", detalle: "Cliente no encontrado para actualizar." });
-        }
-
-        const usuarioAutenticado = req.usuarioJWT || (req.session && req.session.usuario);
-        const intentaModificarApto = req.body.fechaEmisionApto !== undefined || req.body.fechaVencimientoApto !== undefined;
-
-        // Regla: un socio no puede cargar ni modificar su propio apto médico.
-        if (intentaModificarApto && usuarioAutenticado && usuarioAutenticado.rol === 'cliente') {
-            return res.status(403).json({
-                error: "Acceso denegado",
-                detalle: "Los socios no tienen permisos para cargar o modificar certificados de apto médico."
+            return res.status(404).json({
+                error: 'Cliente no encontrado',
+                detalle: `No existe un usuario con el ID ${req.params.id}`
             });
         }
 
-        // Bloqueo de escalada de privilegios.
-        const datosPermitidos = { ...req.body };
-        delete datosPermitidos.rol;
-        delete datosPermitidos.estado;
-        delete datosPermitidos.id;
+        const usuarioAutenticado = req.usuarioJWT || req.usuario || req.user || (req.session && req.session.usuario);
+        const { nombre, apellido, telefono, estado, patologiasActivas, rol, password, fechaEmisionApto, fechaVencimientoApto } = req.body;
 
-        // Tratamiento de Apto Médico y Fechas.
-        if (intentaModificarApto) {
-            const zona = { timeZone: 'America/Argentina/Buenos_Aires' };
-            const hoyStr = new Date().toLocaleDateString('en-CA', zona);
-            const hoyUTC = new Date(`${hoyStr}T00:00:00.000Z`);
-
-            // No se acepta vencimiento sin emisión previa o enviada.
-            if (req.body.fechaVencimientoApto && !req.body.fechaEmisionApto && !cliente.fechaEmisionApto) {
-                return res.status(400).json({
-                    error: "Validación fallida",
-                    detalle: "No se puede registrar un vencimiento sin una fecha de emisión de apto médico."
+        // Un socio autenticado no puede cargar su propio apto ni cambiar su rol.
+        if (usuarioAutenticado && usuarioAutenticado.rol === 'cliente') {
+            if (fechaEmisionApto !== undefined || fechaVencimientoApto !== undefined || rol !== undefined) {
+                return res.status(403).json({
+                    error: 'Acceso denegado',
+                    detalle: 'Un socio no puede cargar su propio apto médico ni auto-escalar roles.'
                 });
             }
-
-            if (req.body.fechaEmisionApto) {
-                const emisionUTC = normalizarFechaUTC(req.body.fechaEmisionApto);
-
-                // Rechazar emisión con fecha futura.
-                if (emisionUTC.getTime() > hoyUTC.getTime()) {
-                    return res.status(400).json({
-                        error: "Validación fallida",
-                        detalle: "La fecha de emisión del apto médico no puede ser futura."
-                    });
-                }
-
-                // Rechazar emisión con más de 7 días de antigüedad al momento de cargarla.
-                const hace7DiasUTC = new Date(hoyUTC.getTime() - 7 * 86400000);
-                if (emisionUTC.getTime() < hace7DiasUTC.getTime()) {
-                    return res.status(400).json({
-                        error: "Validación fallida",
-                        detalle: "El certificado de apto médico presentado tiene más de 7 días de emitido."
-                    });
-                }
-
-                cliente.fechaEmisionApto = emisionUTC;
-
-                // Si no se envía vencimiento o viene null, se calcula a 1 año exacto de la emisión.
-                if (req.body.fechaVencimientoApto === null || req.body.fechaVencimientoApto === undefined) {
-                    const emisionStr = req.body.fechaEmisionApto.split('T')[0];
-                    const anioSiguiente = Number(emisionStr.slice(0, 4)) + 1;
-                    cliente.fechaVencimientoApto = new Date(`${anioSiguiente}${emisionStr.slice(4)}T00:00:00.000Z`);
-                }
-            }
-
-            if (req.body.fechaVencimientoApto) {
-                const vencimientoUTC = normalizarFechaUTC(req.body.fechaVencimientoApto);
-                const emisionRef = cliente.fechaEmisionApto || normalizarFechaUTC(req.body.fechaEmisionApto);
-
-                // Rechazar vencimiento anterior a la emisión.
-                if (emisionRef && vencimientoUTC.getTime() < emisionRef.getTime()) {
-                    return res.status(400).json({
-                        error: "Validación fallida",
-                        detalle: "La fecha de vencimiento no puede ser anterior a la fecha de emisión."
-                    });
-                }
-
-                cliente.fechaVencimientoApto = vencimientoUTC;
-            }
-
-            cliente.aptoMedicoVigente = calcularVigenciaApto(cliente.fechaVencimientoApto);
-            delete datosPermitidos.fechaEmisionApto;
-            delete datosPermitidos.fechaVencimientoApto;
-            delete datosPermitidos.aptoMedicoVigente;
         }
 
-        // Si actualizan contraseña, se asigna para que actúe el pre-save hook.
-        if (datosPermitidos.password) {
-            cliente.password = datosPermitidos.password.trim();
-            delete datosPermitidos.password;
+        // Si se intenta fijar vencimiento sin emisión registrada.
+        if (fechaVencimientoApto && !fechaEmisionApto && !cliente.fechaEmisionApto) {
+            return res.status(400).json({
+                error: 'Datos inválidos',
+                detalle: 'No se puede ingresar un vencimiento sin una fecha de emisión registrada.'
+            });
         }
 
-        Object.assign(cliente, datosPermitidos);
+        if (fechaEmisionApto !== undefined) {
+            const fEmision = new Date(fechaEmisionApto);
+            const hoy = new Date();
+            if (fEmision > hoy) {
+                return res.status(400).json({ error: 'Fecha futura', detalle: 'La fecha de emisión no puede ser futura.' });
+            }
+            const diasAntiguedad = (hoy - fEmision) / (1000 * 60 * 60 * 24);
+            if (diasAntiguedad > 8) {
+                return res.status(400).json({ error: 'Emisión fuera de plazo', detalle: 'La emisión supera los 7 días de validez para carga.' });
+            }
+
+            cliente.fechaEmisionApto = fEmision;
+            if (fechaVencimientoApto) {
+                const fVenc = new Date(fechaVencimientoApto);
+                if (fVenc < fEmision) {
+                    return res.status(400).json({ error: 'Fechas inconsistentes', detalle: 'El vencimiento no puede ser anterior a la emisión.' });
+                }
+                cliente.fechaVencimientoApto = fVenc;
+            } else {
+                cliente.fechaVencimientoApto = calcularVencimientoDefecto(fEmision);
+            }
+        } else if (fechaVencimientoApto !== undefined) {
+            const fVenc = new Date(fechaVencimientoApto);
+            if (cliente.fechaEmisionApto && fVenc < cliente.fechaEmisionApto) {
+                return res.status(400).json({ error: 'Fechas inconsistentes', detalle: 'El vencimiento no puede ser anterior a la emisión.' });
+            }
+            cliente.fechaVencimientoApto = fVenc;
+        }
+
+        cliente.aptoMedicoVigente = calcularAptoVigente(cliente.fechaVencimientoApto);
+
+        if (nombre) cliente.nombre = String(nombre).trim();
+        if (apellido) cliente.apellido = String(apellido).trim();
+        if (telefono !== undefined) cliente.telefono = String(telefono).trim();
+        if (patologiasActivas !== undefined) cliente.patologiasActivas = String(patologiasActivas).trim();
+        if (rol && usuarioAutenticado && usuarioAutenticado.rol === 'empleado') cliente.rol = rol;
+        if (estado && ['activo', 'inactivo', 'licencia'].includes(estado)) cliente.estado = estado;
+
+        // Actualización de contraseña, porta cambio de clave por API y blanqueo.
+        if (password) {
+            cliente.password = String(password).trim();
+            cliente.intentosFallidos = 0;
+            cliente.bloqueadoHasta = null;
+        }
+
         await cliente.save();
 
-        const clienteRespuesta = cliente.toObject();
-        delete clienteRespuesta.password;
+        const respuesta = cliente.toObject();
+        delete respuesta.password;
+        respuesta.aptoMedicoVigente = calcularAptoVigente(respuesta.fechaVencimientoApto);
 
-        res.status(200).json(clienteRespuesta);
+        res.status(200).json(respuesta);
     } catch (error) {
         next(error);
     }
 };
 
-// Baja lógica para preservación histórica en la BD.
-exports.eliminar = async (req, res, next) => {
+// DELETE /clientes/:id - API - Baja Lógica.
+exports.eliminarCliente = async (req, res, next) => {
     try {
-        const cliente = await Cliente.findOneAndUpdate(
-            { id: Number(req.params.id) },
-            { estado: 'inactivo' },
-            { new: true }
-        ).select('-password');
+        const cliente = await Cliente.findOne({ id: Number(req.params.id) });
+        if (!cliente) {
+            return res.status(404).json({
+                error: 'Cliente no encontrado',
+                detalle: `No existe un usuario con el ID ${req.params.id}`
+            });
+        }
+
+        cliente.estado = 'inactivo';
+        await cliente.save();
+
+        res.status(200).json({
+            mensaje: `El usuario ${cliente.nombre} ${cliente.apellido} fue dado de baja lógica correctamente.`,
+            cliente: { id: cliente.id, estado: cliente.estado }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// GET /vista/clientes - Consola Web.
+exports.mostrarPistasClientes = async (req, res, next) => {
+    try {
+        const clientes = await Cliente.find().select('-password').sort({ id: 1 });
+        const clientesConApto = clientes.map(c => {
+            const obj = c.toObject();
+            obj.aptoMedicoVigente = calcularAptoVigente(obj.fechaVencimientoApto);
+            return obj;
+        });
+        res.render('clientes', {
+            clientes: clientesConApto,
+            usuario: req.session.usuario,
+            mensajeExito: req.query.exito || null,
+            mensajeError: req.query.error || null
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// POST /vista/clientes/cambiar-estado/:id - Consola Web.
+exports.cambiarEstadoClienteWeb = async (req, res, next) => {
+    try {
+        const { nuevoEstado } = req.body;
+        const cliente = await Cliente.findOne({ id: Number(req.params.id) });
 
         if (!cliente) {
-            return res.status(404).json({ error: "No encontrado", detalle: "Cliente no encontrado para archivar." });
+            return res.redirect('/vista/clientes?error=' + encodeURIComponent('El usuario seleccionado no existe.'));
         }
-        res.status(200).json({ 
-            mensaje: "Socio archivado lógicamente como inactivo para trazabilidad histórica.", 
-            cliente 
+
+        if (['activo', 'inactivo', 'licencia'].includes(nuevoEstado)) {
+            cliente.estado = nuevoEstado;
+            await cliente.save();
+        }
+
+        res.redirect('/vista/clientes?exito=' + encodeURIComponent(`Estado de ${cliente.nombre} ${cliente.apellido} actualizado a '${nuevoEstado}'.`));
+    } catch (error) {
+        next(error);
+    }
+};
+
+// POST /vista/clientes/resetear-password/:id - Consola Web - Blanqueo por Admin.
+exports.resetearPasswordWeb = async (req, res, next) => {
+    try {
+        const cliente = await Cliente.findOne({ id: Number(req.params.id) });
+        if (!cliente) {
+            return res.redirect('/vista/clientes?error=' + encodeURIComponent('Usuario no encontrado.'));
+        }
+
+        cliente.password = '12345678';
+        cliente.intentosFallidos = 0;
+        cliente.bloqueadoHasta = null;
+        await cliente.save();
+
+        res.redirect('/vista/clientes?exito=' + encodeURIComponent(`Contraseña de ${cliente.nombre} ${cliente.apellido} restablecida a '12345678' y bloqueo suspendido.`));
+    } catch (error) {
+        next(error);
+    }
+};
+
+// GET /vista/apto-fisico - Consola Web - Apto Médico.
+exports.mostrarAptoFisicoWeb = async (req, res, next) => {
+    try {
+        const clientes = await Cliente.find({ rol: 'cliente' }).select('-password').sort({ apellido: 1, nombre: 1 });
+        res.render('apto-fisico', {
+            clientes,
+            usuario: req.session.usuario,
+            mensajeExito: req.query.exito || null,
+            mensajeError: req.query.error || null
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// POST /vista/apto-fisico - Consola Web - Carga de Apto Médico.
+exports.actualizarAptoFisicoWeb = async (req, res, next) => {
+    try {
+        const { clienteId, fechaEmisionApto, fechaVencimientoApto } = req.body;
+        const targetId = clienteId || req.params.id;
+        const cliente = await Cliente.findOne({ id: Number(targetId) });
+
+        if (!cliente) {
+            return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('Socio no encontrado.'));
+        }
+
+        if (!fechaEmisionApto) {
+            return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('Debe ingresar la fecha de emisión del certificado.'));
+        }
+
+        const fEmision = new Date(fechaEmisionApto);
+        const hoy = new Date();
+        if (fEmision > hoy) {
+            return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('La fecha de emisión no puede ser futura.'));
+        }
+
+        const diasAntiguedad = (hoy - fEmision) / (1000 * 60 * 60 * 24);
+        if (diasAntiguedad > 8) {
+            return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('El certificado supera los 7 días de emitido y no puede ser cargado.'));
+        }
+
+        cliente.fechaEmisionApto = fEmision;
+        if (fechaVencimientoApto) {
+            const fVenc = new Date(fechaVencimientoApto);
+            if (fVenc < fEmision) {
+                return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('La fecha de vencimiento no puede ser anterior a la de emisión.'));
+            }
+            cliente.fechaVencimientoApto = fVenc;
+        } else {
+            cliente.fechaVencimientoApto = calcularVencimientoDefecto(fEmision);
+        }
+
+        cliente.aptoMedicoVigente = calcularAptoVigente(cliente.fechaVencimientoApto);
+        await cliente.save();
+
+        res.redirect('/vista/apto-fisico?exitoApto=' + encodeURIComponent(`Apto físico de ${cliente.nombre} ${cliente.apellido} actualizado correctamente.`));
     } catch (error) {
         next(error);
     }

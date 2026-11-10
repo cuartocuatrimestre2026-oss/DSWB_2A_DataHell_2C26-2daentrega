@@ -38,7 +38,7 @@ body {
     font-size: var(--font-size-p);
 }
 
-/* Navbar fija al hacer scroll */
+/* Navbar */
 .navbar {
     position: sticky;
     top: 0;
@@ -97,6 +97,7 @@ body {
     border-radius: 20px;
     font-size: var(--font-size-small);
     border: 1px solid var(--quaternary-color);
+    white-space: nowrap;
 }
 
 .btn-salir {
@@ -325,7 +326,7 @@ body {
     }
 }
 
-/* Botones */
+/* Botones Principales */
 .btn-primario {
     background-color: var(--primary-color);
     color: var(--tertiary-color);
@@ -416,15 +417,18 @@ body {
     border: 1px solid #c6f6d5;
 }
 
-/* Badges */
+/* Badges de Tablas */
 .badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 4px 10px;
     border-radius: 12px;
     font-size: var(--font-size-small);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.4px;
+    white-space: nowrap;
 }
 
 .badge-reservado {
@@ -453,49 +457,114 @@ body {
     color: var(--quinary-color);
 }
 
+/* Badge de Recepción Personal en grilla */
 .badge-empleado {
-    background-color: #eeddcc;
-    color: var(--footer-bg-color);
+    background: var(--quinary-color);
+    color: var(--tertiary-color);
     border: 1px solid var(--quaternary-color);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
 }
 
-/* Acciones en grilla */
-.btn-exito-chico {
-    background-color: #38a169;
-    color: white;
+/* Controles de Acción en Tablas */
+.acciones-fila {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.acciones-fila form {
+    margin: 0;
+    display: inline-block;
+}
+
+/* Botón "Atender Ingreso"  */
+.btn-exito-chico,
+.acciones-fila button[type="submit"]:not(.btn-peligro-chico):not(.btn-reset-chico):not([class*="cancel"]):not([title*="Cancelar"]) {
+    background-color: #2e7d32;
+    color: #ffffff;
     border: none;
     padding: 6px 12px;
     border-radius: 4px;
     font-size: var(--font-size-small);
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s;
+    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: background-color 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
 
-.btn-exito-chico:hover {
-    background-color: #2f855a;
+.btn-exito-chico:hover,
+.acciones-fila button[type="submit"]:not(.btn-peligro-chico):not(.btn-reset-chico):not([class*="cancel"]):not([title*="Cancelar"]):hover {
+    background-color: #256628;
 }
 
-.btn-peligro-chico {
+/* Botón "Cancelar" - Formato Captura de Referencia */
+.btn-peligro-chico,
+.acciones-fila form[action*="cancelar"] button,
+.acciones-fila button[class*="cancel"],
+.acciones-fila button[title*="Cancelar"] {
     background-color: var(--primary-color);
-    color: white;
+    color: #ffffff;
     border: none;
     padding: 6px 12px;
     border-radius: 4px;
     font-size: var(--font-size-small);
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s;
+    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: background-color 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
 
-.btn-peligro-chico:hover {
+.btn-peligro-chico:hover,
+.acciones-fila form[action*="cancelar"] button:hover,
+.acciones-fila button[class*="cancel"]:hover,
+.acciones-fila button[title*="Cancelar"]:hover {
     background-color: #6d150e;
 }
 
-.acciones-fila {
-    display: flex;
-    gap: 6px;
+/* Botón "Blanquear Clave" en Padrón de Socios */
+.btn-reset-chico {
+    background-color: var(--footer-bg-color);
+    color: var(--tertiary-color);
+    border: 1px solid var(--quaternary-color);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: var(--font-size-small);
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
     align-items: center;
+    gap: 4px;
+    line-height: 1.2;
+    transition: background 0.2s, color 0.2s;
+}
+
+.btn-reset-chico:hover {
+    background-color: var(--primary-color);
+    color: #ffffff;
+}
+
+.acciones-fila select {
+    padding: 4px 8px;
+    font-size: var(--font-size-small);
+    border-radius: 4px;
+    border: 1px solid var(--quaternary-color);
+    background: #ffffff;
+    height: 28px;
 }
 
 .texto-verde-bold {
@@ -556,6 +625,7 @@ body {
     padding: 12px 16px;
     text-align: left;
     border-bottom: 1px solid #eee7df;
+    vertical-align: middle;
 }
 
 .tabla-turnos th {

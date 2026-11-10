@@ -64,6 +64,11 @@ async function inicializarBaseDeDatos() {
     const vencimiento = new Date(ahora.getTime() + 363 * 86400000); // ~1 año
 
     for (const cli of seedData.clientes) {
+        // Si el cliente en seedData es admin, se omite para no pisar credenciales.
+        if (cli.rol === 'empleado' || cli.email === 'admin@espaciosideral.com') {
+            continue;
+        }
+
         await Cliente.findOneAndUpdate(
             { id: cli.id },
             {
@@ -82,30 +87,33 @@ async function inicializarBaseDeDatos() {
         );
     }
 
-    // Usuario administrativo (admin@espaciosideral.com)
-    // $setOnInsert preserva la contraseña si un test la modificó durante la prueba.
-    const saltAdmin = await bcrypt.genSalt(10);
-    const passAdminHasheada = await bcrypt.hash('admin123', saltAdmin);
-    await Cliente.findOneAndUpdate(
-        { email: 'admin@espaciosideral.com' },
-        {
-            $setOnInsert: {
-                id: 999,
-                nombre: 'Personal',
-                apellido: 'Recepción',
-                dni: '99999999',
-                email: 'admin@espaciosideral.com',
-                telefono: '1140009999',
-                password: passAdminHasheada,
-                rol: 'empleado',
-                estado: 'activo',
-                aptoMedicoVigente: true
-            }
-        },
-        { upsert: true, returnDocument: 'after' }
-    );
+    // Usuario administrativo (admin@espaciosideral.com).
+    // Si ya existe un admin en la base, NO se modifica ni se pisa su password.
+    const adminExistente = await Cliente.findOne({
+        $or: [
+            { email: 'admin@espaciosideral.com' },
+            { rol: 'empleado' }
+        ]
+    });
 
-    // Sincronizar contador de clientes usando los IDs regulares.
+    if (!adminExistente) {
+        const saltAdmin = await bcrypt.genSalt(10);
+        const passAdminHasheada = await bcrypt.hash('admin123', saltAdmin);
+        await Cliente.create({
+            id: 999,
+            nombre: 'Personal',
+            apellido: 'Recepción',
+            dni: '99999999',
+            email: 'admin@espaciosideral.com',
+            telefono: '1140009999',
+            password: passAdminHasheada,
+            rol: 'empleado',
+            estado: 'activo',
+            aptoMedicoVigente: true
+        });
+    }
+
+    // Sincroniza el contador de clientes usando los IDs regulares.
     const ultimoCliente = await Cliente.findOne({ id: { $lt: 900 } }).sort({ id: -1 });
     const maxClienteId = ultimoCliente ? ultimoCliente.id : 5;
     await Contador.findOneAndUpdate(

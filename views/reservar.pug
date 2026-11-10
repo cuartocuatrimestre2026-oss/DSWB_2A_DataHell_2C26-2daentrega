@@ -4,30 +4,30 @@ block contenido
   .formulario-contenedor
     .formulario-tarjeta
       h2 📅 Reservar Turno para Actividad
-      p.subtitulo Seleccioná la actividad deportiva, el docente a cargo y el horario habilitado en la grilla oficial.
+      p.subtitulo Seleccioná la actividad deportiva. Los docentes y salas habilitadas se filtrarán automáticamente según la disciplina.
       if error
         .alerta.alerta-error
           strong ⚠️ Atención al reservar: 
           span= error
-      form(action="/reservar", method="POST", class="form-estilizado", data-confirm="¿Desea confirmar la reserva de esta clase en el horario seleccionado?")
+      form#formReserva(action="/reservar", method="POST", class="form-estilizado", data-confirm="¿Desea confirmar la reserva de esta clase en el horario seleccionado?")
         .grupo-campo
           label(for="servicioId") Actividad / Disciplina:
           select#servicioId(name="servicioId", required)
             option(value="") -- Seleccionar actividad --
             each s in servicios
-              option(value=s.id)= `${s.nombre} (${s.modalidad}) - Duración: ${s.duracionMinutos} min`
+              option(value=s.id, data-sala-requerida=s.salaRequerida, data-nombre=s.nombre)= `${s.nombre} (${s.modalidad}) - Duración: ${s.duracionMinutos} min`
         .grupo-campo
           label(for="instructorId") Instructor / Docente:
           select#instructorId(name="instructorId", required)
-            option(value="") -- Seleccionar docente --
+            option(value="") -- Primero elija una actividad --
             each i in instructores
-              option(value=i.id)= `${i.apellido}, ${i.nombre} - Especialidad: ${i.especialidad}`
+              option(value=i.id, data-especialidad=i.especialidad)= `${i.apellido}, ${i.nombre} (Esp: ${i.especialidad})`
         .grupo-campo
-          label(for="salaId") Sala / Espacio Físico:
+          label(for="salaId") Sala / Espacio Físico Homologado:
           select#salaId(name="salaId", required)
-            option(value="") -- Seleccionar sala --
+            option(value="") -- Primero elija una actividad --
             each sala in salas
-              option(value=sala.id)= `${sala.nombre} (Capacidad nominal: ${sala.capacidadNormal} personas)`
+              option(value=sala.id, data-sala-id=sala.id)= `${sala.nombre} (Capacidad nominal: ${sala.capacidadNormal} personas)`
         .fila-campos
           .grupo-campo
             label(for="fecha") Fecha:

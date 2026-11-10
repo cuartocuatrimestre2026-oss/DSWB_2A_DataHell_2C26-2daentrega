@@ -12,7 +12,7 @@ const manejoErroresMiddleware = require('./middlewares/manejoErroresMiddleware')
 const { estaAutenticado, esEmpleado } = require('./middlewares/authMiddleware');
 const inicializarSockets = require('./sockets/chat.socket');
 
-// Rutas modulares
+// Rutas modulares.
 const authRoutes = require('./routes/auth.routes');
 const pacienteRoutes = require('./routes/paciente.routes');
 const turnosRoutes = require('./routes/turnos.routes');
@@ -21,7 +21,7 @@ const serviciosRoutes = require('./routes/servicios.routes');
 const instructoresRoutes = require('./routes/instructores.routes');
 const salasRoutes = require('./routes/salas.routes');
 
-// Modelos y controladores
+// Modelos y controladores.
 const Turno = require('./models/Turno');
 const Cliente = require('./models/Cliente');
 const Sala = require('./models/Sala');
@@ -34,13 +34,13 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-// Middlewares base
+// Middlewares base.
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(loggerMiddleware);
 app.set('trust proxy', 1);
 
-// Configuración de sesiones
+// Configuración de sesiones.
 const secretoSesion = process.env.SESSION_SECRET;
 const middlewareSesion = session({
     secret: secretoSesion,
@@ -61,32 +61,44 @@ io.engine.use((req, res, next) => {
     middlewareSesion(req, res, next);
 });
 
-// Inicialización de sockets
+// Inicialización de sockets.
 inicializarSockets(io);
 
-// Disponibilidad del usuario logueado en plantillas Pug
+// Disponibilidad del usuario logueado en plantillas Pug.
 app.use((req, res, next) => {
     res.locals.usuarioActual = (req.session && req.session.usuario) ? req.session.usuario : null;
     next();
 });
 
-// Recursos estáticos y vistas Pug
+// Recursos estáticos y vistas Pug.
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
 
-// Rutas web de autenticación y portal de socios
+// Rutas web de autenticación y portal de socios.
 app.use('/', authRoutes);
 app.use('/', pacienteRoutes);
 
-// Rutas de la API REST
+// Rutas de la API REST y Consola de Clientes.
 app.use('/turnos', turnosRoutes);
 app.use('/clientes', clientesRoutes);
 app.use('/servicios', serviciosRoutes);
 app.use('/instructores', instructoresRoutes);
 app.use('/salas', salasRoutes);
 
-// Vistas Server-Side para Administración y Recepción
+// Redirecciones directas de la barra de navegación hacia la consola de clientes.
+app.get('/vista/clientes', estaAutenticado, esEmpleado, (req, res) => {
+    const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    res.redirect(`/clientes/vista/clientes${query}`);
+});
+app.post('/vista/clientes/resetear-password/:id', estaAutenticado, esEmpleado, (req, res) => {
+    res.redirect(307, `/clientes/vista/clientes/resetear-password/${req.params.id}`);
+});
+app.post('/vista/clientes/cambiar-estado/:id', estaAutenticado, esEmpleado, (req, res) => {
+    res.redirect(307, `/clientes/vista/clientes/cambiar-estado/${req.params.id}`);
+});
+
+// Portada pública del sistema.
 app.get('/', async (req, res, next) => {
     try {
         const [totalTurnos, totalClientes, totalSalas, totalServicios] = await Promise.all([
@@ -146,7 +158,7 @@ app.post('/vista/turnos/atender/:id', estaAutenticado, esEmpleado, turnosControl
 app.post('/vista/turnos/cancelar/:id', estaAutenticado, esEmpleado, turnosController.cancelarWeb);
 app.post('/vista/turnos/sobreturno', estaAutenticado, esEmpleado, turnosController.crearSobreturnoWeb);
 
-// Pantalla y procesamiento de Apto Físico para Recepción
+// Pantalla y procesamiento de Apto Físico para Recepción.
 app.get('/vista/apto-fisico', estaAutenticado, esEmpleado, async (req, res, next) => {
     try {
         const socios = await Cliente.find({ rol: 'cliente', estado: 'activo' }).sort({ apellido: 1, nombre: 1 });
@@ -225,16 +237,7 @@ app.post('/vista/apto-fisico', estaAutenticado, esEmpleado, async (req, res, nex
     }
 });
 
-app.get('/vista/clientes', estaAutenticado, esEmpleado, async (req, res, next) => {
-    try {
-        const clientes = await Cliente.find().sort({ id: 1 });
-        res.render('clientes', { clientes });
-    } catch (error) {
-        next(error);
-    }
-});
-
-// Manejo de recursos no encontrados (404)
+// Manejo de recursos no encontrados (404).
 app.use((req, res) => {
     const esRutaApi = req.originalUrl.startsWith('/turnos') ||
                       req.originalUrl.startsWith('/clientes') ||
@@ -257,10 +260,10 @@ app.use((req, res) => {
     });
 });
 
-// Middleware centralizado de errores
+// Middleware centralizado de errores.
 app.use(manejoErroresMiddleware);
 
-// Inicio del servidor HTTP con WebSockets
+// Inicio del servidor HTTP con WebSockets.
 async function iniciarServidor() {
     try {
         await connectDB();

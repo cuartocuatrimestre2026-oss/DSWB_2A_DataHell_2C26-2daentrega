@@ -2,8 +2,20 @@ extends layouts/main
 
 block contenido
   .encabezado-seccion
-    h2 Padrón General de Socios y Personal
-    p Base de usuarios de Espacio Sideral S.A.S. gestionada con persistencia NoSQL en MongoDB.
+    .titulo-con-accion
+      div
+        h2 Padrón General de Socios y Colaboradores
+        p Gestión de estados históricos, apto médico preventivo y administración de credenciales.
+      div
+        span.etiqueta-info Mostrador Espacio Sideral S.A.S.
+  if mensajeExito
+    .alerta.alerta-exito
+      strong ✅ Operación Exitosa: 
+      span= mensajeExito
+  if mensajeError
+    .alerta.alerta-error
+      strong ⚠️ Atención: 
+      span= mensajeError
   table.tabla-turnos
     thead
       tr
@@ -11,10 +23,10 @@ block contenido
         th Apellido y Nombre
         th DNI
         th Correo Electrónico
-        th Teléfono
-        th Apto Físico
-        th Perfil / Rol
+        th Rol
         th Estado
+        th Apto Físico
+        th Acciones de Mostrador
     tbody
       if clientes.length
         each c in clientes
@@ -25,29 +37,32 @@ block contenido
               strong= `${c.apellido}, ${c.nombre}`
             td= c.dni
             td= c.email
-            td= c.telefono || 'Sin teléfono'
             td
               if c.rol === 'empleado'
-                span.texto-apagado N/A
-              else if c.aptoMedicoVigente
-                span.badge.badge-atendido Apto al día
+                span.badge.badge-empleado Recepción: Personal
               else
-                span.badge.badge-cancelado Apto Pendiente
-            td
-              if c.rol === 'empleado'
-                span.badge.badge-empleado Personal Administrativo
-              else
-                span.badge.badge-regular Socio / Paciente
+                span.badge.badge-regular Socio
             td
               if c.estado === 'activo'
                 span.badge.badge-atendido Activo
               else if c.estado === 'licencia'
-                span.badge.badge-sobreturno En Licencia
+                span.badge.badge-reservado Licencia
               else
-                span.badge.badge-cancelado Inactivo (Histórico)
+                span.badge.badge-cancelado Inactivo
+            td
+              if c.aptoMedicoVigente
+                span.texto-verde-bold Vigente (OK)
+              else
+                span.badge.badge-cancelado Vencido
+            td
+              .acciones-fila
+                form(action=`/clientes/vista/clientes/cambiar-estado/${c.id}`, method="POST")
+                  select(name="nuevoEstado", onchange="this.form.submit()")
+                    option(value="activo", selected=c.estado === 'activo') Activo
+                    option(value="inactivo", selected=c.estado === 'inactivo') Inactivo
+                    option(value="licencia", selected=c.estado === 'licencia') Licencia
+                form(action=`/clientes/vista/clientes/resetear-password/${c.id}`, method="POST", data-confirm=`¿Confirma el blanqueo de contraseña para ${c.nombre} ${c.apellido}? Se restablecerá a '12345678' y se levantará cualquier bloqueo por intentos fallidos.`)
+                  button.btn-reset-chico(type="submit", title="Restablecer contraseña a 12345678") 🔑 Blanquear Clave
       else
         tr
-          td(colspan="8") No se registran usuarios en la base de datos.
-  .acciones-retorno
-    a.btn-volver(href="/") &larr; Volver al Inicio
-    a.btn-volver(href="/vista/turnos") Ir a la Grilla de Recepción &rarr;
+          td(colspan="8") No hay usuarios registrados en el padrón.

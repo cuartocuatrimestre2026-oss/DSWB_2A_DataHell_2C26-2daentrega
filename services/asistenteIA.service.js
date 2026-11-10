@@ -1,63 +1,98 @@
 const Servicio = require('../models/Servicio');
 const Sala = require('../models/Sala');
-const Instructor = require('../models/Instructor');
 
-/**
- * Servicio de Asistente Inteligente para Espacio Sideral S.A.S.
- * Procesa consultas de lenguaje natural, búsqueda de disciplinas y reglas de negocio.
- */
-async function procesarConsulta(mensajeUsuario, contextoUsuario = null) {
-    if (!mensajeUsuario || typeof mensajeUsuario !== 'string') {
-        return 'Hola, ¿en qué puedo ayudarte hoy con tus actividades en Espacio Sideral?';
-    }
-
-    const texto = mensajeUsuario.toLowerCase().trim();
-
-    // Consultas sobre Pilates Reformer y Camillas.
-    if (texto.includes('reformer') || texto.includes('camilla') || texto.includes('pilates')) {
-        return 'En Pilates Reformer contamos con un Salón exclusivo con 10 camillas fijas. Por estricta seguridad biomecánica y física, el sobreturno en esta disciplina es CERO (0). Se requiere además contar con Apto Médico vigente.';
-    }
-
-    // Consultas sobre Apto Médico / Certificado de Salud.
-    if (texto.includes('apto') || texto.includes('medico') || texto.includes('certificado') || texto.includes('vencimiento')) {
-        return 'El Certificado de Aptitud Médica tiene una vigencia legal de 365 días corridos. Al presentarlo en recepción, la fecha de emisión no debe superar los 7 días de antigüedad. El centro cuenta con una tolerancia de 15 días de gracia para su renovación cordial.';
-    }
-
-    // Consultas sobre Sobreturnos y Capacidad.
-    if (texto.includes('sobreturno') || texto.includes('cupo') || texto.includes('lleno') || texto.includes('aforo')) {
-        return 'Los sobreturnos son de gestión exclusiva en recepción cuando el aforo regular está colmado. Se admite hasta un 15% truncado de la capacidad de la sala (máx. 2 en SUM y 3 en Cardio) con justificación obligatoria. En Pilates Reformer no se admiten sobreturnos.';
-    }
-
-    // Búsqueda asistida en Base de Datos: Disciplinas y Actividades.
-    if (texto.includes('disciplina') || texto.includes('clase') || texto.includes('actividad') || texto.includes('servicio') || texto.includes('yoga') || texto.includes('funcional')) {
-        try {
-            const servicios = await Servicio.find().sort({ id: 1 });
-            const listado = servicios.map(s => `• ${s.nombre} (${s.modalidad}, ${s.duracionMinutos} min)`).join('\n');
-            return `Nuestras actividades disponibles en Espacio Sideral son:\n${listado}\n\nPodés reservar tu lugar directamente desde la sección "Reservar Clase".`;
-        } catch (err) {
-            return 'Ofrecemos Pilates Reformer, Hatha Yoga, Entrenamiento Funcional y terapias como Registros Akáshicos.';
-        }
-    }
-
-    // Búsqueda de Salas y Espacios.
-    if (texto.includes('sala') || texto.includes('salon') || texto.includes('sum') || texto.includes('gabinete')) {
-        try {
-            const salas = await Sala.find().sort({ id: 1 });
-            const listado = salas.map(s => `• ${s.nombre} (Capacidad: ${s.capacidadNormal} personas)`).join('\n');
-            return `Nuestros espacios físicos homologados son:\n${listado}`;
-        } catch (err) {
-            return 'Disponemos del Salón Reformer (10 camillas), Salón Cardio (20 pers), SUM 1 y 2 (15 pers) y Gabinetes Individuales.';
-        }
-    }
-
-    // Consultas sobre Horarios y Apertura de Agenda.
-    if (texto.includes('horario') || texto.includes('abren') || texto.includes('semana') || texto.includes('domingo')) {
-        return 'Espacio Sideral atiende de lunes a sábados en 3 turnos (07:00 a 22:30 hs). La agenda de reservas para la semana siguiente se habilita todos los domingos a las 00:00 hs.';
-    }
-
-    // Respuesta orientativa por defecto.
-    const nombre = (contextoUsuario && contextoUsuario.nombre) ? `${contextoUsuario.nombre}` : 'socio';
-    return `Hola ${nombre}, soy el Asistente Virtual de TurnoFlex. Puedo orientarte sobre nuestras disciplinas (Pilates, Yoga, Funcional), capacidades de salas, estado de tu Apto Médico o ayudarte a navegar tus reservas. ¿Qué te gustaría consultar?`;
+function normalizarTexto(texto) {
+    if (!texto) return '';
+    return texto
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remueve tildes
+        .trim();
 }
 
-module.exports = { procesarConsulta };
+exports.procesarMensaje = async (mensaje, usuario = null) => {
+    try {
+        const query = normalizarTexto(mensaje);
+        const esAdmin = usuario && usuario.rol === 'empleado';
+        const nombreUsuario = usuario ? usuario.nombre : 'practicante';
+
+        // Saludos y Menú Inicial de Ayuda.
+        if (query.match(/^(hola|buen|buenas|hello|hi|inicio|empezar|ayuda|opciones|menu)/)) {
+            if (esAdmin) {
+                return `¡Hola ${nombreUsuario} (Personal de Recepción)! 👋 Como copiloto de mostrador podés consultarme sobre:\n` +
+                       `• 'Salas' o 'Aforos': capacidades nominales y topes de salas.\n` +
+                       `• 'Sobreturnos': normativa del 15% truncado y regla 0% en camillas.\n` +
+                       `• 'Apto Médico': plazos legales de 365 días y gracia de 15 días.\n` +
+                       `• 'Disciplinas': catálogo activo en base de datos.`;
+            } else {
+                return `¡Hola ${nombreUsuario}! 👋 Te doy la bienvenida a Espacio Sideral. ¿En qué te puedo asesorar hoy? Podés consultarme sobre:\n` +
+                       `1. 'Disciplinas' o 'Clases': para conocer las actividades y modalidades.\n` +
+                       `2. 'Salas': para conocer nuestros espacios físicos.\n` +
+                       `3. 'Apto Médico': requisitos de salud y vigencias para reservar.\n` +
+                       `4. 'Horarios': franjas de clases y políticas de cancelación.`;
+            }
+        }
+
+        // Consulta en caliente a Base de Datos: Disciplinas y Actividades.
+        if (query.includes('disciplina') || query.includes('clase') || query.includes('servicio') || query.includes('actividad') || query.includes('yoga') || query.includes('pilates') || query.includes('funcional')) {
+            const servicios = await Servicio.find().sort({ id: 1 });
+            if (servicios && servicios.length > 0) {
+                const lista = servicios.map(s => `• ${s.nombre} (${s.modalidad}): bloque de ${s.duracionMinutos} min en Sala #${s.salaRequerida}`).join('\n');
+                return `En Espacio Sideral disponemos de las siguientes disciplinas activas:\n${lista}\n\nRecordá que para agendar cualquiera de ellas debés contar con tu Apto Médico al día.`;
+            }
+            return "Actualmente disponemos de Pilates Reformer, Hatha Yoga, Entrenamiento Funcional y Registros Akáshicos.";
+        }
+
+        // Consulta en caliente a Base de Datos: Salas, Aforos y Sobretornos Permitidos.
+        if (query.includes('sala') || query.includes('aforo') || query.includes('capacidad') || query.includes('espacio') || query.includes('salon')) {
+            const salas = await Sala.find().sort({ id: 1 });
+            if (salas && salas.length > 0) {
+                const lista = salas.map(s => {
+                    const st = s.calcularSobreturnosPermitidos();
+                    const stTxt = st === 0 ? 'Sobreturno CERO (rígido)' : `admite hasta +${st} sobreturno(s)`;
+                    return `• Sala #${s.id} - ${s.nombre}: capacidad estándar de ${s.capacidadNormal} personas (${stTxt}).`;
+                }).join('\n');
+                return `Infraestructura física homologada de Espacio Sideral (350 m²):\n${lista}`;
+            }
+            return "Contamos con el Salón Pilates Reformer (10 camillas fijas), Salón Funcional (20 personas), SUM 1 y SUM 2 (15 personas) y Gabinetes Individuales.";
+        }
+
+        // Reglas de Apto Médico y Certificado de Salud.
+        if (query.includes('apto') || query.includes('medico') || query.includes('certificado') || query.includes('salud') || query.includes('venc') || query.includes('gracia')) {
+            return `📋 Normativa Sanitaria de Apto Médico (RF-02):\n` +
+                   `• Vigencia: El certificado tiene una validez legal de 365 días corridos.\n` +
+                   `• Período de Gracia: Otorgamos 15 días cordiales para tramitar la renovación antes de bloquear el sistema de reservas.\n` +
+                   `• Trámite: Se presenta el certificado físico en recepción (con no más de 7 días de emitido) para que el personal lo cargue y habilite tu ficha en el momento.`;
+        }
+
+        // Políticas de Horarios, Franjas Fijas y Cancelaciones.
+        if (query.includes('horario') || query.includes('franja') || query.includes('grilla') || query.includes('cancelar') || query.includes('cancelacion')) {
+            return `⏰ Horarios y Cancelación de Clases:\n` +
+                   `• Grilla Oficial: Las clases se dictan en bloques cerrados de 60 minutos entre las 08:00 y las 20:00 hs.\n` +
+                   `• Cancelación Autónoma: Podés cancelar tu clase desde la sección 'Mis Turnos' siempre que falten al menos 4 horas para el inicio. Dentro de las 4 horas previas, la cancelación queda bloqueada por sistema y debés llamar a recepción.`;
+        }
+
+        // Sobreturnos y Políticas de Sobrecupo.
+        if (query.includes('sobreturno') || query.includes('sobrecupo') || query.includes('excepcion')) {
+            return `⚠️ Regla Gerencial de Sobreturnos (RN05 / RN06):\n` +
+                   `• Se autorizan únicamente desde la consola de recepción ante clases regulares colmadas, con justificación obligatoria (mínimo 5 caracteres).\n` +
+                   `• Tope matemático: Máximo 15% con truncamiento entero.\n` +
+                   `• En Pilates Reformer el sobreturno es algorítmicamente CERO por motivos de seguridad física (no hay camillas libres).`;
+        }
+
+        // Respuesta de cortesía ante despedidas.
+        if (query.match(/^(gracias|muchas gracias|chau|adios|listo)/)) {
+            return `¡Un placer ayudarte, ${nombreUsuario}! Que tengas un excelente día de bienestar en Espacio Sideral. ✨`;
+        }
+
+        // Mensaje por defecto orientador.
+        return `Entendido. No encontré una coincidencia exacta para "${mensaje}". Podés probar escribiendo:\n` +
+               `• 'disciplinas' para ver la oferta de actividades.\n` +
+               `• 'salas' para consultar los salones y sus cupos.\n` +
+               `• 'apto medico' para informarte sobre el estado de salud requerido.\n` +
+               `• 'horarios' para conocer la grilla y política de cancelación de 4 horas.`;
+    } catch (error) {
+        console.error("Error en asistenteIA.service:", error);
+        return "El asistente se encuentra temporalmente en mantenimiento local. Por favor consulte en el mostrador del centro.";
+    }
+};

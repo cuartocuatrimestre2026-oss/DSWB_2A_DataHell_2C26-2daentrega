@@ -9,6 +9,7 @@ block contenido
         .alerta.alerta-error
           strong Error: 
           span= error
+          p.texto-apagado Si su acceso fue suspendido por reiterados intentos fallidos o no recuerda su contraseña, comuníquese con la administración para su desbloqueo.
       form(action="/login", method="POST", class="form-estilizado")
         .grupo-campo
           label(for="identificador") Correo Electrónico o DNI:
@@ -17,8 +18,16 @@ block contenido
           label(for="password") Contraseña:
           input#password(type="password", name="password", placeholder="Ingresá tu contraseña", required)
         button.btn-primario(type="submit") Ingresar a mi Cuenta
+      .pista-demo
+        strong 💡 Usuarios de prueba: 
+        | Recepción: 
+        code admin@espaciosideral.com
+        |  / 
+        code admin123
+        |  | Socio: 
+        code juan.perez@mail.com
+        |  / 
+        code 123456
       .enlace-secundario
-        p ¿Sos nuevo paciente? 
-          a(href="/registro") Registrate aquí para reservar clases
-        p.pista-demo
-          small 💡 <strong>Usuarios de prueba:</strong> Recepción: <code>admin@espaciosideral.com</code> / <code>admin123</code> | Socio de prueba: <code>juan.perez@mail.com</code> / <code>123456</code>
+        | ¿Sos nuevo paciente? 
+        a(href="/registro") Registrate aquí para reservar clases

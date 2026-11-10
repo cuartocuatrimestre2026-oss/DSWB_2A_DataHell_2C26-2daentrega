@@ -3,14 +3,23 @@ const router = express.Router();
 const clientesController = require('../controllers/clientes.controller');
 const validarId = require('../middlewares/validarIdMiddleware');
 const verificarJWT = require('../middlewares/jwtMiddleware');
+const { estaAutenticado, esEmpleado } = require('../middlewares/authMiddleware');
 
-// Lectura de padrón protegida con token JWT.
-router.get('/', verificarJWT, clientesController.obtenerTodos);
-router.get('/:id', verificarJWT, validarId, clientesController.obtenerPorId);
+// Consola Web de Mostrador.
+router.get('/vista/clientes', estaAutenticado, esEmpleado, clientesController.mostrarPistasClientes);
+router.post('/vista/clientes/cambiar-estado/:id', estaAutenticado, esEmpleado, validarId, clientesController.cambiarEstadoClienteWeb);
+router.post('/vista/clientes/resetear-password/:id', estaAutenticado, esEmpleado, validarId, clientesController.resetearPasswordWeb);
 
-// Creación, actualización y baja lógica protegidas.
-router.post('/', verificarJWT, clientesController.crear);
-router.put('/:id', verificarJWT, validarId, clientesController.actualizar);
-router.delete('/:id', verificarJWT, validarId, clientesController.eliminar);
+// Pantallas Web de Apto Físico.
+router.get('/vista/apto-fisico', estaAutenticado, esEmpleado, clientesController.mostrarAptoFisicoWeb);
+router.post('/vista/apto-fisico', estaAutenticado, esEmpleado, clientesController.actualizarAptoFisicoWeb);
+router.post('/vista/apto-fisico/:id', estaAutenticado, esEmpleado, validarId, clientesController.actualizarAptoFisicoWeb);
+
+// API RESTful montada en /clientes.
+router.get('/', verificarJWT, clientesController.listarClientes);
+router.get('/:id', validarId, clientesController.obtenerClientePorId);
+router.post('/', clientesController.crearCliente);
+router.put('/:id', validarId, verificarJWT, clientesController.actualizarCliente);
+router.delete('/:id', validarId, verificarJWT, clientesController.eliminarCliente);
 
 module.exports = router;
