@@ -7,9 +7,9 @@ block contenido
       p.subtitulo Seleccioná la actividad deportiva, el docente a cargo y el horario habilitado en la grilla oficial.
       if error
         .alerta.alerta-error
-          strong Error al reservar: 
+          strong ⚠️ Atención al reservar: 
           span= error
-      form(action="/reservar", method="POST", class="form-estilizado")
+      form(action="/reservar", method="POST", class="form-estilizado", data-confirm="¿Desea confirmar la reserva de esta clase en el horario seleccionado?")
         .grupo-campo
           label(for="servicioId") Actividad / Disciplina:
           select#servicioId(name="servicioId", required)
@@ -27,7 +27,7 @@ block contenido
           select#salaId(name="salaId", required)
             option(value="") -- Seleccionar sala --
             each sala in salas
-              option(value=sala.id)= `${sala.nombre} (Capacidad estándar: ${sala.capacidadNormal} personas)`
+              option(value=sala.id)= `${sala.nombre} (Capacidad nominal: ${sala.capacidadNormal} personas)`
         .fila-campos
           .grupo-campo
             label(for="fecha") Fecha:
@@ -38,7 +38,7 @@ block contenido
               option(value="") -- Seleccionar franja --
               if franjasHorarias
                 each f in franjasHorarias
-                  option(value=f)= `${f} hs`
+                  option(value=f)= `${f} hs (Bloque de 60 min)`
         button.btn-primario(type="submit") Confirmar Reserva Regular
       .enlace-secundario
         a.btn-volver(href="/mis-turnos") &larr; Volver a Mis Turnos

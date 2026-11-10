@@ -38,15 +38,18 @@ body {
     font-size: var(--font-size-p);
 }
 
-/* Navbar */
+/* Navbar fija al hacer scroll */
 .navbar {
+    position: sticky;
+    top: 0;
+    z-index: 999;
     background-color: var(--footer-bg-color);
     color: var(--text-color-light);
     padding: 1rem 2.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 10px rgba(74, 53, 49, 0.3);
+    box-shadow: 0 2px 10px rgba(74, 53, 49, 0.35);
     flex-wrap: wrap;
     gap: 1rem;
 }
@@ -398,6 +401,7 @@ body {
     border-radius: 6px;
     margin-bottom: 1.5rem;
     font-size: var(--font-size-p);
+    line-height: 1.4;
 }
 
 .alerta-error {
@@ -654,10 +658,12 @@ body {
     z-index: 1000;
     transition: transform 0.2s, background-color 0.2s;
 }
+
 .chat-boton-flotante:hover {
     transform: scale(1.05);
     background-color: #6d150e;
 }
+
 .chat-ventana {
     position: fixed;
     bottom: 80px;
@@ -673,9 +679,11 @@ body {
     border: 1px solid var(--tertiary-color);
     overflow: hidden;
 }
+
 .chat-ventana.oculto {
     display: none;
 }
+
 .chat-header {
     background-color: var(--footer-bg-color);
     color: var(--tertiary-color);
@@ -685,6 +693,7 @@ body {
     align-items: center;
     font-weight: 700;
 }
+
 .chat-btn-cerrar {
     background: transparent;
     border: none;
@@ -692,6 +701,7 @@ body {
     font-size: 1.2rem;
     cursor: pointer;
 }
+
 .chat-cuerpo {
     flex: 1;
     padding: 12px;
@@ -701,6 +711,7 @@ body {
     gap: 10px;
     background: #fdfbf7;
 }
+
 .burbuja-chat {
     max-width: 85%;
     padding: 8px 12px;
@@ -709,24 +720,28 @@ body {
     line-height: 1.4;
     white-space: pre-wrap;
 }
+
 .burbuja-usuario {
     align-self: flex-end;
     background-color: var(--secondary-color);
     color: white;
     border-bottom-right-radius: 2px;
 }
+
 .burbuja-bot {
     align-self: flex-start;
     background-color: #eae1d7;
     color: var(--footer-bg-color);
     border-bottom-left-radius: 2px;
 }
+
 .burbuja-autor {
     font-size: 0.7rem;
     opacity: 0.8;
     margin-bottom: 3px;
     font-weight: 700;
 }
+
 .chat-footer {
     display: flex;
     padding: 10px;
@@ -734,6 +749,7 @@ body {
     background: white;
     gap: 6px;
 }
+
 .chat-footer input {
     flex: 1;
     padding: 8px 12px;
@@ -742,6 +758,7 @@ body {
     font-size: var(--font-size-small);
     outline: none;
 }
+
 .btn-chat-enviar {
     background: var(--primary-color);
     color: white;

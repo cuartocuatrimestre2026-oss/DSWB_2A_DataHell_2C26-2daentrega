@@ -4,7 +4,7 @@ const Instructor = require('../models/Instructor');
 const Sala = require('../models/Sala');
 const turnosService = require('../services/turnos.service');
 
-// Franjas horarias homologadas del centro.
+// Franjas horarias homologadas del centro (bloques cerrados de 60 min).
 const FRANJAS_HORARIAS = [
     '08:00', '09:00', '10:00', '11:00',
     '14:00', '15:00', '16:00', '17:00',
@@ -126,7 +126,6 @@ exports.procesarReserva = async (req, res, next) => {
             });
         }
 
-        // Solo permitir reservas a partir de la fecha y hora actual.
         if (fechaHoraLocal.getTime() <= Date.now()) {
             const [servicios, instructores, salas] = await cargarCatalogos();
             return res.render('reservar', {
