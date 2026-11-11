@@ -1,0 +1,60 @@
+extends layouts/main
+
+block contenido
+  .encabezado-seccion
+    h2 Reasignación de Turno Ausente
+    p Seleccioná un nuevo docente, fecha y franja horaria para reasignar el turno del socio.
+
+  if errorReasignacion
+    .alerta.alerta-error
+      strong Error: 
+      span= errorReasignacion
+
+  .formulario-tarjeta
+    h3 Datos del Turno Original
+    ul
+      li
+        strong Socio: 
+        | #{cliente ? `${cliente.apellido}, ${cliente.nombre} (DNI: ${cliente.dni})` : `ID ${turno.clienteId}`}
+      li
+        strong Disciplina: 
+        | #{servicio ? servicio.nombre : `ID ${turno.servicioId}`}
+      li
+        strong Sala Asignada: 
+        | #{sala ? sala.nombre : `ID ${turno.salaId}`}
+      li
+        strong Fecha y Hora previa: 
+        | #{new Date(turno.fechaHora).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}
+
+    hr
+
+    form(action=`/vista/turnos/reasignar/${turno.id}`, method="POST", class="form-estilizado")
+      .fila-campos
+        .grupo-campo
+          label(for="instructorId") Docente a cargo:
+          select#instructorId(name="instructorId", required)
+            option(value="") Seleccione un docente...
+            if instructores && instructores.length
+              each inst in instructores
+                option(value=inst.id)= `${inst.apellido}, ${inst.nombre} (${inst.especialidad})`
+
+        .grupo-campo
+          label(for="fecha") Nueva Fecha:
+          input#fecha(type="date", name="fecha", required)
+
+      .fila-campos
+        .grupo-campo
+          label(for="hora") Horario oficial:
+          select#hora(name="hora", required)
+            option(value="") Seleccione horario...
+            if franjasHorarias && franjasHorarias.length
+              each h in franjasHorarias
+                option(value=h)= `${h} hs`
+
+        .grupo-campo
+          label(for="motivo") Motivo (requerido si pasa a sobreturno):
+          input#motivo(type="text", name="motivo", placeholder="Ej: Reasignación por inasistencia justificada")
+
+      .acciones-hero
+        button.btn-primario(type="submit") Confirmar Reasignación
+        a.btn-volver(href="/vista/turnos") Cancelar y Volver

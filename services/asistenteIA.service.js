@@ -6,11 +6,40 @@ function normalizarTexto(texto) {
     return texto
         .toLowerCase()
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // Remueve tildes
+        .replace(/[\u0300-\u036f]/g, "")
         .trim();
 }
 
-exports.procesarMensaje = async (mensaje, usuario = null) => {
+// Consulta fallback a una API externa.
+async function consultarApiExterna(mensaje, rolUsuario) {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY_IA;
+    if (!apiKey) return null;
+
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        const promptContexto = `Sos el Asistente Virtual oficial de 'Espacio Sideral', un centro de bienestar integral y disciplinas corporales. 
+El usuario tiene rol '${rolUsuario}'. Responde de forma cordial, concisa (máximo 3 párrafos cortos) y orientada al bienestar y las actividades del centro.
+Pregunta del usuario: "${mensaje}"`;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: promptContexto }] }]
+            })
+        });
+
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        const textoRespuesta = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        return textoRespuesta ? textoRespuesta.trim() : null;
+    } catch (err) {
+        return null;
+    }
+}
+
+async function procesarMensaje(mensaje, usuario = null) {
     try {
         const query = normalizarTexto(mensaje);
         const esAdmin = usuario && usuario.rol === 'empleado';
@@ -33,7 +62,7 @@ exports.procesarMensaje = async (mensaje, usuario = null) => {
             }
         }
 
-        // Consulta en caliente a Base de Datos: Disciplinas y Actividades.
+        // Consulta a la Base de Datos: Disciplinas y Actividades.
         if (query.includes('disciplina') || query.includes('clase') || query.includes('servicio') || query.includes('actividad') || query.includes('yoga') || query.includes('pilates') || query.includes('funcional')) {
             const servicios = await Servicio.find().sort({ id: 1 });
             if (servicios && servicios.length > 0) {
@@ -85,6 +114,12 @@ exports.procesarMensaje = async (mensaje, usuario = null) => {
             return `¡Un placer ayudarte, ${nombreUsuario}! Que tengas un excelente día de bienestar en Espacio Sideral. ✨`;
         }
 
+        // Consulta a API externa si la pregunta no coincidió con las reglas duras.
+        const respuestaExterna = await consultarApiExterna(mensaje, usuario ? usuario.rol : 'visitante');
+        if (respuestaExterna) {
+            return respuestaExterna;
+        }
+
         // Mensaje por defecto orientador.
         return `Entendido. No encontré una coincidencia exacta para "${mensaje}". Podés probar escribiendo:\n` +
                `• 'disciplinas' para ver la oferta de actividades.\n` +
@@ -95,4 +130,10 @@ exports.procesarMensaje = async (mensaje, usuario = null) => {
         console.error("Error en asistenteIA.service:", error);
         return "El asistente se encuentra temporalmente en mantenimiento local. Por favor consulte en el mostrador del centro.";
     }
+}
+
+// Exportación dual para compatibilidad total con cualquier módulo que requiera el servicio.
+module.exports = {
+    procesarMensaje,
+    procesarConsulta: procesarMensaje
 };

@@ -30,7 +30,7 @@ const turnoSchema = new mongoose.Schema({
     },
     estado: {
         type: String,
-        enum: ['reservado', 'atendido', 'cancelado'],
+        enum: ['reservado', 'atendido', 'cancelado', 'ausente', 'reasignado'],
         default: 'reservado'
     },
     esSobreturno: {
@@ -45,13 +45,21 @@ const turnoSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Métodos de dominio
+// Métodos de dominio.
 turnoSchema.methods.cancelar = function() {
     this.estado = 'cancelado';
 };
 
 turnoSchema.methods.atender = function() {
     this.estado = 'atendido';
+};
+
+turnoSchema.methods.marcarAusente = function() {
+    this.estado = 'ausente';
+};
+
+turnoSchema.methods.marcarReasignado = function() {
+    this.estado = 'reasignado';
 };
 
 module.exports = mongoose.model('Turno', turnoSchema);
