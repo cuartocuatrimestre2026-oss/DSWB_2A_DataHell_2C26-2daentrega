@@ -27,11 +27,11 @@ const Cliente = require('./models/Cliente');
 const Sala = require('./models/Sala');
 const Servicio = require('./models/Servicio');
 const turnosController = require('./controllers/turnos.controller');
+const turnosService = require('./services/turnos.service');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
 const PORT = process.env.PORT || 3000;
 
 // Middlewares base.
@@ -53,7 +53,6 @@ const middlewareSesion = session({
         sameSite: 'lax'
     }
 });
-
 app.use(middlewareSesion);
 
 // Compartir sesión con Socket.io
@@ -79,14 +78,14 @@ app.set('views', path.join(__dirname, 'views'));
 app.use('/', authRoutes);
 app.use('/', pacienteRoutes);
 
-// Rutas de la API REST y Consola de Clientes.
+// Rutas de la API REST.
 app.use('/turnos', turnosRoutes);
 app.use('/clientes', clientesRoutes);
 app.use('/servicios', serviciosRoutes);
 app.use('/instructores', instructoresRoutes);
 app.use('/salas', salasRoutes);
 
-// Redirecciones directas de la barra de navegación hacia la consola de clientes.
+// Redirecciones directas de barra de navegación hacia la consola de clientes.
 app.get('/vista/clientes', estaAutenticado, esEmpleado, (req, res) => {
     const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
     res.redirect(`/clientes/vista/clientes${query}`);
@@ -118,8 +117,10 @@ app.get('/', async (req, res, next) => {
     }
 });
 
+// Consola Operativa de Recepción.
 app.get('/vista/turnos', estaAutenticado, esEmpleado, async (req, res, next) => {
     try {
+        await turnosService.actualizarAusentes();
         const [turnos, clientes, salas] = await Promise.all([
             Turno.find().sort({ fechaHora: 1 }),
             Cliente.find(),
@@ -127,7 +128,6 @@ app.get('/vista/turnos', estaAutenticado, esEmpleado, async (req, res, next) => 
         ]);
         const clientesMap = new Map(clientes.map(c => [Number(c.id), c]));
         const salasMap = new Map(salas.map(s => [Number(s.id), s.nombre]));
-
         const turnosMapeados = turnos.map(t => {
             const clienteObj = clientesMap.get(Number(t.clienteId));
             return {
@@ -144,10 +144,10 @@ app.get('/vista/turnos', estaAutenticado, esEmpleado, async (req, res, next) => 
                 motivoSobreturno: t.motivoSobreturno
             };
         });
-
         res.render('turnos', {
             turnos: turnosMapeados,
-            errorSobreturno: req.query.errorSobreturno || null
+            errorSobreturno: req.query.errorSobreturno || null,
+            exitoReasignacion: req.query.exitoReasignacion || null
         });
     } catch (error) {
         next(error);
@@ -158,6 +158,10 @@ app.post('/vista/turnos/atender/:id', estaAutenticado, esEmpleado, turnosControl
 app.post('/vista/turnos/cancelar/:id', estaAutenticado, esEmpleado, turnosController.cancelarWeb);
 app.post('/vista/turnos/sobreturno', estaAutenticado, esEmpleado, turnosController.crearSobreturnoWeb);
 
+// Reasignación de turnos ausentes desde la consola de recepción.
+app.get('/vista/turnos/reasignar/:id', estaAutenticado, esEmpleado, turnosController.mostrarReasignarWeb);
+app.post('/vista/turnos/reasignar/:id', estaAutenticado, esEmpleado, turnosController.reasignarWeb);
+
 // Pantalla y procesamiento de Apto Físico para Recepción.
 app.get('/vista/apto-fisico', estaAutenticado, esEmpleado, async (req, res, next) => {
     try {
@@ -166,7 +170,6 @@ app.get('/vista/apto-fisico', estaAutenticado, esEmpleado, async (req, res, next
         const zona = { timeZone: 'America/Argentina/Buenos_Aires' };
         const hoyStr = new Date().toLocaleDateString('en-CA', zona);
         const hoyUTC = new Date(`${hoyStr}T00:00:00.000Z`);
-
         const sociosMapeados = socios.map(s => {
             const obj = s.toObject();
             if (obj.fechaVencimientoApto) {
@@ -177,7 +180,6 @@ app.get('/vista/apto-fisico', estaAutenticado, esEmpleado, async (req, res, next
             }
             return obj;
         });
-
         res.render('apto-fisico', {
             socios: sociosMapeados,
             errorApto: req.query.errorApto || null,
@@ -194,28 +196,22 @@ app.post('/vista/apto-fisico', estaAutenticado, esEmpleado, async (req, res, nex
         if (!clienteId || !fechaEmisionApto) {
             return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('El socio y la fecha de emisión son obligatorios.'));
         }
-
         const cliente = await Cliente.findOne({ id: Number(clienteId) });
         if (!cliente) {
             return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('El socio seleccionado no existe.'));
         }
-
         const zona = { timeZone: 'America/Argentina/Buenos_Aires' };
         const hoyStr = new Date().toLocaleDateString('en-CA', zona);
         const hoyUTC = new Date(`${hoyStr}T00:00:00.000Z`);
         const emisionUTC = new Date(`${fechaEmisionApto.split('T')[0]}T00:00:00.000Z`);
-
         if (emisionUTC.getTime() > hoyUTC.getTime()) {
             return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('La fecha de emisión no puede ser futura.'));
         }
-
         const hace7DiasUTC = new Date(hoyUTC.getTime() - 7 * 86400000);
         if (emisionUTC.getTime() < hace7DiasUTC.getTime()) {
             return res.redirect('/vista/apto-fisico?errorApto=' + encodeURIComponent('El certificado de apto médico presentado tiene más de 7 días de emitido.'));
         }
-
         cliente.fechaEmisionApto = emisionUTC;
-
         if (fechaVencimientoApto) {
             const vencimientoUTC = new Date(`${fechaVencimientoApto.split('T')[0]}T00:00:00.000Z`);
             if (vencimientoUTC.getTime() < emisionUTC.getTime()) {
@@ -227,10 +223,8 @@ app.post('/vista/apto-fisico', estaAutenticado, esEmpleado, async (req, res, nex
             const anioSiguiente = Number(emisionStr.slice(0, 4)) + 1;
             cliente.fechaVencimientoApto = new Date(`${anioSiguiente}${emisionStr.slice(4)}T00:00:00.000Z`);
         }
-
         cliente.aptoMedicoVigente = cliente.fechaVencimientoApto.getTime() >= hoyUTC.getTime();
         await cliente.save();
-
         res.redirect('/vista/apto-fisico?exitoApto=' + encodeURIComponent('Apto médico cargado exitosamente.'));
     } catch (error) {
         next(error);
@@ -245,7 +239,6 @@ app.use((req, res) => {
                       req.originalUrl.startsWith('/servicios') ||
                       req.originalUrl.startsWith('/instructores') ||
                       req.originalUrl.startsWith('/login/token');
-
     if (!esRutaApi && req.accepts('html') && !req.xhr) {
         return res.status(404).render('error', {
             status: 404,
@@ -253,7 +246,6 @@ app.use((req, res) => {
             detalle: `La ruta solicitada '${req.originalUrl}' no existe en el servidor.`
         });
     }
-
     res.status(404).json({
         error: "Ruta no encontrada",
         detalle: `El endpoint '${req.originalUrl}' no existe en la API REST.`
