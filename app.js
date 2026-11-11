@@ -158,7 +158,7 @@ app.post('/vista/turnos/atender/:id', estaAutenticado, esEmpleado, turnosControl
 app.post('/vista/turnos/cancelar/:id', estaAutenticado, esEmpleado, turnosController.cancelarWeb);
 app.post('/vista/turnos/sobreturno', estaAutenticado, esEmpleado, turnosController.crearSobreturnoWeb);
 
-// Reasignación de turnos ausentes desde la consola de recepción.
+// Reasignación de turnos ausentes desde la consola de recepción
 app.get('/vista/turnos/reasignar/:id', estaAutenticado, esEmpleado, turnosController.mostrarReasignarWeb);
 app.post('/vista/turnos/reasignar/:id', estaAutenticado, esEmpleado, turnosController.reasignarWeb);
 

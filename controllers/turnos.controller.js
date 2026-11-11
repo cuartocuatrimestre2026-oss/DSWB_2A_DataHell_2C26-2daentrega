@@ -1,9 +1,15 @@
 const Turno = require('../models/Turno');
+const Cliente = require('../models/Cliente');
+const Servicio = require('../models/Servicio');
+const Instructor = require('../models/Instructor');
+const Sala = require('../models/Sala');
 const turnosService = require('../services/turnos.service');
+const { FRANJAS_HORARIAS } = require('./paciente.controller');
 
 // Listado completo de turnos.
 exports.obtenerTodos = async (req, res, next) => {
     try {
+        await turnosService.actualizarAusentes();
         const turnos = await Turno.find().sort({ fechaHora: 1 });
         res.status(200).json(turnos);
     } catch (error) {
@@ -14,6 +20,7 @@ exports.obtenerTodos = async (req, res, next) => {
 // Turno por ID.
 exports.obtenerPorId = async (req, res, next) => {
     try {
+        await turnosService.actualizarAusentes();
         const turno = await Turno.findOne({ id: Number(req.params.id) });
         if (!turno) {
             return res.status(404).json({ error: "No encontrado", detalle: "El turno solicitado no existe." });
@@ -27,6 +34,7 @@ exports.obtenerPorId = async (req, res, next) => {
 // Turnos por ID de Cliente.
 exports.obtenerPorCliente = async (req, res, next) => {
     try {
+        await turnosService.actualizarAusentes();
         const turnosCliente = await Turno.find({ clienteId: Number(req.params.id) }).sort({ fechaHora: 1 });
         res.status(200).json(turnosCliente);
     } catch (error) {
@@ -37,6 +45,7 @@ exports.obtenerPorCliente = async (req, res, next) => {
 // Turnos por ID de Instructor.
 exports.obtenerPorInstructor = async (req, res, next) => {
     try {
+        await turnosService.actualizarAusentes();
         const turnosInstructor = await Turno.find({ instructorId: Number(req.params.id) }).sort({ fechaHora: 1 });
         res.status(200).json(turnosInstructor);
     } catch (error) {
@@ -122,7 +131,6 @@ exports.actualizarEstado = async (req, res, next) => {
 
         // Si se intenta cambiar de sala, se valida la capacidad.
         if (salaId && Number(salaId) !== turno.salaId) {
-            const Sala = require('../models/Sala');
             const nuevaSala = await Sala.findOne({ id: Number(salaId) });
             if (!nuevaSala) return res.status(404).json({ error: "Sala no encontrada" });
 
@@ -214,6 +222,61 @@ exports.crearSobreturnoWeb = async (req, res, next) => {
         }
 
         res.redirect('/vista/turnos');
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Formulario de reasignación de un turno ausente - consola de recepción.
+exports.mostrarReasignarWeb = async (req, res, next) => {
+    try {
+        const turno = await Turno.findOne({ id: Number(req.params.id) });
+        if (!turno || turno.estado !== 'ausente') {
+            return res.redirect('/vista/turnos');
+        }
+        const [cliente, servicio, sala, instructores] = await Promise.all([
+            Cliente.findOne({ id: turno.clienteId }),
+            Servicio.findOne({ id: turno.servicioId }),
+            Sala.findOne({ id: turno.salaId }),
+            Instructor.find().sort({ apellido: 1, nombre: 1 })
+        ]);
+        res.render('reasignar-turno', {
+            turno,
+            cliente,
+            servicio,
+            sala,
+            instructores,
+            franjasHorarias: FRANJAS_HORARIAS,
+            errorReasignacion: req.query.errorReasignacion || null
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Procesa la reasignación, genera el turno nuevo y marca el original como reasignado.
+exports.reasignarWeb = async (req, res, next) => {
+    try {
+        const { instructorId, fecha, hora, motivo } = req.body;
+        if (!instructorId || !fecha || !hora) {
+            return res.redirect(`/vista/turnos/reasignar/${req.params.id}?errorReasignacion=` + encodeURIComponent('Complete el docente, la fecha y el horario.'));
+        }
+        if (!FRANJAS_HORARIAS.includes(hora)) {
+            return res.redirect(`/vista/turnos/reasignar/${req.params.id}?errorReasignacion=` + encodeURIComponent('El horario seleccionado no corresponde a un bloque de la grilla oficial.'));
+        }
+        const resultado = await turnosService.reasignarTurnoDominio({
+            turnoId: req.params.id,
+            instructorId,
+            fecha,
+            hora,
+            motivo
+        });
+        if (resultado.error) {
+            return res.redirect(`/vista/turnos/reasignar/${req.params.id}?errorReasignacion=` + encodeURIComponent(resultado.mensaje));
+        }
+        res.redirect('/vista/turnos?exitoReasignacion=' + encodeURIComponent(
+            `Turno #${req.params.id} reasignado: se generó el turno #${resultado.turno.id}${resultado.turno.esSobreturno ? ' como SOBRETURNO' : ''}.`
+        ));
     } catch (error) {
         next(error);
     }
