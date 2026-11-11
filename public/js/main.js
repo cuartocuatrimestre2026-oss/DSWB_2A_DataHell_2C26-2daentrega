@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Filtrado dinámico en cascada EXCLUSIVO para views/reservar.pug
+    // Filtrado dinámico en cascada EXCLUSIVO para views/reservar.pug.
     const formReserva = document.getElementById('formReserva');
     if (formReserva) {
         const selectServicio = formReserva.querySelector('select#servicioId');
@@ -151,6 +151,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             }
+
+            // Desconexión limpia preventiva ante navegación o bfcache del navegador.
+            window.addEventListener('pagehide', () => {
+                if (socket && socket.connected) {
+                    socket.disconnect();
+                }
+            });
+            window.addEventListener('beforeunload', () => {
+                if (socket && socket.connected) {
+                    socket.disconnect();
+                }
+            });
         } else {
             console.warn('[TurnoBot] La librería cliente de Socket.io no se encuentra disponible.');
         }
