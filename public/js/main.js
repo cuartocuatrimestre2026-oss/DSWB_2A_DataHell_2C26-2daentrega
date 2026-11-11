@@ -81,13 +81,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Integración del Asistente Virtual WebSockets en tiempo real - TurnoBot.
-    // IDs alineados con el widget definido en views/layouts/main.pug.
-    const chatBoton = document.getElementById('chat-widget-boton');
-    const chatVentana = document.getElementById('chat-widget-ventana');
-    const chatBtnCerrar = document.getElementById('chat-btn-cerrar');
-    const chatForm = document.getElementById('chat-form');
-    const chatInput = document.getElementById('chat-input');
-    const chatCuerpo = document.getElementById('chat-mensajes');
+    const chatBoton = document.getElementById('chatBotonFlotante');
+    const chatVentana = document.getElementById('chatVentana');
+    const chatBtnCerrar = document.getElementById('chatBtnCerrar');
+    const chatForm = document.getElementById('chatForm');
+    const chatInput = document.getElementById('chatInput');
+    const chatCuerpo = document.getElementById('chatCuerpo');
 
     if (chatBoton && chatVentana && window.io) {
         const socket = io();
@@ -122,8 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
             chatCuerpo.scrollTop = chatCuerpo.scrollHeight;
         }
 
-        // Nombres de eventos alineados con sockets/chat.socket.js.
-        socket.on('mensaje_servidor', (data) => {
+        socket.on('mensajeBot', (data) => {
             agregarMensaje(data.autor || 'TurnoBot', data.texto, false);
         });
 
@@ -133,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const mensaje = chatInput.value.trim();
                 if (mensaje) {
                     agregarMensaje('Tú', mensaje, true);
-                    socket.emit('mensaje_cliente', { texto: mensaje });
+                    socket.emit('mensajeUsuario', { texto: mensaje });
                     chatInput.value = '';
                 }
             });

@@ -27,7 +27,6 @@ const Cliente = require('./models/Cliente');
 const Sala = require('./models/Sala');
 const Servicio = require('./models/Servicio');
 const turnosController = require('./controllers/turnos.controller');
-const turnosService = require('./services/turnos.service');
 
 const app = express();
 const server = http.createServer(app);
@@ -121,8 +120,6 @@ app.get('/', async (req, res, next) => {
 
 app.get('/vista/turnos', estaAutenticado, esEmpleado, async (req, res, next) => {
     try {
-        // Antes de consultar, los turnos vencidos sin presente pasan a 'ausente'.
-        await turnosService.actualizarAusentes();
         const [turnos, clientes, salas] = await Promise.all([
             Turno.find().sort({ fechaHora: 1 }),
             Cliente.find(),
@@ -150,8 +147,7 @@ app.get('/vista/turnos', estaAutenticado, esEmpleado, async (req, res, next) => 
 
         res.render('turnos', {
             turnos: turnosMapeados,
-            errorSobreturno: req.query.errorSobreturno || null,
-            exitoReasignacion: req.query.exitoReasignacion || null
+            errorSobreturno: req.query.errorSobreturno || null
         });
     } catch (error) {
         next(error);
@@ -161,10 +157,6 @@ app.get('/vista/turnos', estaAutenticado, esEmpleado, async (req, res, next) => 
 app.post('/vista/turnos/atender/:id', estaAutenticado, esEmpleado, turnosController.marcarAtendidoWeb);
 app.post('/vista/turnos/cancelar/:id', estaAutenticado, esEmpleado, turnosController.cancelarWeb);
 app.post('/vista/turnos/sobreturno', estaAutenticado, esEmpleado, turnosController.crearSobreturnoWeb);
-
-// Reasignación de turnos ausentes desde la consola de recepción.
-app.get('/vista/turnos/reasignar/:id', estaAutenticado, esEmpleado, turnosController.mostrarReasignarWeb);
-app.post('/vista/turnos/reasignar/:id', estaAutenticado, esEmpleado, turnosController.reasignarWeb);
 
 // Pantalla y procesamiento de Apto Físico para Recepción.
 app.get('/vista/apto-fisico', estaAutenticado, esEmpleado, async (req, res, next) => {

@@ -22,8 +22,6 @@ const salaSchema = new mongoose.Schema({
 
 // Métodos de dominio y reglas de negocio
 salaSchema.methods.calcularSobreturnosPermitidos = function() {
-    // Salón Pilates Reformer, sobreturno CERO por seguridad biomecánica.
-    if (this.id === 1) return 0;
     return Math.floor(this.capacidadNormal * 0.15);
 };
 

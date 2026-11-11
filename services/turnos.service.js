@@ -20,12 +20,13 @@ function parsearFechaHoraLocal(fechaStr, horaStr) {
 // Comprueba dinámicamente si el socio tiene el apto vigente hoy.
 function esAptoVigente(cliente) {
     if (!cliente) return false;
+    if (cliente.aptoMedicoVigente === false) return false;
     if (cliente.fechaVencimientoApto) {
         const zona = { timeZone: 'America/Argentina/Buenos_Aires' };
         const hoyStr = new Date().toLocaleDateString('en-CA', zona);
         const hoyUTC = new Date(`${hoyStr}T00:00:00.000Z`);
         const vencUTC = new Date(cliente.fechaVencimientoApto);
-        return vencUTC.getTime() + 15 * 86400000 >= hoyUTC.getTime();
+        return vencUTC.getTime() >= hoyUTC.getTime();
     }
     return cliente.aptoMedicoVigente === true;
 }
@@ -260,92 +261,8 @@ async function crearSobreturnoDominio({ clienteId, servicioId, instructorId, sal
     return { error: false, turno };
 }
 
-// Pasa a 'ausente' los turnos que siguen 'reservado' y cuya hora de inicio ya pasó sin que recepción registrara el presente.
-async function actualizarAusentes() {
-    const turnosVencidos = await Turno.find({
-        estado: 'reservado',
-        fechaHora: { $lte: new Date() }
-    });
-    for (const turno of turnosVencidos) {
-        turno.marcarAusente();
-        await turno.save();
-    }
-    return turnosVencidos.length;
-}
-
-// Reasigna un turno 'ausente' a una nueva fecha, hora y docente para el mismo socio, disciplina y sala.
-async function reasignarTurnoDominio({ turnoId, instructorId, fecha, hora, motivo }) {
-    const turnoOriginal = await Turno.findOne({ id: Number(turnoId) });
-    if (!turnoOriginal) {
-        return { error: true, status: 404, mensaje: 'El turno a reasignar no existe.' };
-    }
-    if (turnoOriginal.estado !== 'ausente') {
-        return { error: true, status: 400, mensaje: 'Solo se pueden reasignar turnos en estado ausente.' };
-    }
-
-    // La nueva fecha y hora debe ser futura.
-    const fechaHoraObj = parsearFechaHoraLocal(fecha, hora);
-    if (!fechaHoraObj || isNaN(fechaHoraObj.getTime())) {
-        return { error: true, status: 400, mensaje: 'La fecha u hora seleccionada no es válida.' };
-    }
-    if (fechaHoraObj.getTime() <= Date.now()) {
-        return { error: true, status: 400, mensaje: 'No es posible reasignar un turno a una fecha u horario pasados.' };
-    }
-
-    const sala = await Sala.findOne({ id: Number(turnoOriginal.salaId) });
-    if (!sala) {
-        return { error: true, status: 404, mensaje: 'La sala del turno original no existe.' };
-    }
-
-    // Se determina si el turno nuevo entra como regular o como sobreturno.
-    const reservasRegulares = await Turno.countDocuments({
-        salaId: Number(sala.id),
-        fechaHora: fechaHoraObj,
-        estado: 'reservado',
-        esSobreturno: false
-    });
-
-    let resultado;
-    if (reservasRegulares >= sala.capacidadNormal) {
-        // Aforo regular completo, solo puede generarse como sobreturno.
-        if (sala.calcularSobreturnosPermitidos() === 0) {
-            return { error: true, status: 409, mensaje: `La sala ${sala.nombre} está completa en ese horario y no admite sobreturnos.` };
-        }
-        if (!motivo || typeof motivo !== 'string' || motivo.trim().length < 5) {
-            return { error: true, status: 400, mensaje: 'La sala está completa en ese horario: para generar un sobreturno ingresá un motivo de al menos 5 caracteres.' };
-        }
-        resultado = await crearSobreturnoDominio({
-            clienteId: turnoOriginal.clienteId,
-            servicioId: turnoOriginal.servicioId,
-            instructorId,
-            salaId: sala.id,
-            fechaHoraRaw: `${fecha}T${hora}`,
-            motivo
-        });
-    } else {
-        resultado = await crearTurnoRegularDominio({
-            clienteId: turnoOriginal.clienteId,
-            servicioId: turnoOriginal.servicioId,
-            instructorId,
-            salaId: sala.id,
-            fecha,
-            hora
-        });
-    }
-
-    if (resultado.error) {
-        return resultado;
-    }
-
-    turnoOriginal.marcarReasignado();
-    await turnoOriginal.save();
-    return { error: false, turno: resultado.turno };
-}
-
 module.exports = {
     crearTurnoRegularDominio,
     crearSobreturnoDominio,
-    parsearFechaHoraLocal,
-    actualizarAusentes,
-    reasignarTurnoDominio
+    parsearFechaHoraLocal
 };

@@ -43,10 +43,6 @@ block contenido
                 span.badge.badge-reservado Reservado
               else if t.estado === 'atendido'
                 span.badge.badge-atendido Presente / Atendido
-              else if t.estado === 'ausente'
-                span.badge.badge-ausente Ausente
-              else if t.estado === 'reasignado'
-                span.badge.badge-reasignado Reasignado
               else
                 span.badge.badge-cancelado Cancelado
             td= t.esSobreturno ? 'SOBRETURNO' : 'REGULAR'

@@ -1,8 +1,8 @@
-const { procesarMensaje } = require('../services/asistenteIA.service');
+const { procesarConsulta } = require('../services/asistenteIA.service');
 
 function inicializarSockets(io) {
     io.on('connection', (socket) => {
-        // Obtiene el usuario de la sesión si existe.
+        // Obtenemos el usuario de la sesión si existe.
         const usuarioSesion = socket.request.session ? socket.request.session.usuario : null;
 
         // Mensaje de bienvenida inicial.
@@ -19,7 +19,7 @@ function inicializarSockets(io) {
             const mensajeTexto = (data && data.texto) ? data.texto : '';
             
             // Procesamiento a través del motor inteligente.
-            const respuestaTexto = await procesarMensaje(mensajeTexto, usuarioSesion);
+            const respuestaTexto = await procesarConsulta(mensajeTexto, usuarioSesion);
 
             socket.emit('mensaje_servidor', {
                 autor: 'TurnoBot',
@@ -29,6 +29,7 @@ function inicializarSockets(io) {
         });
 
         socket.on('disconnect', () => {
+            // Cierre normal de conexión.
         });
     });
 }
