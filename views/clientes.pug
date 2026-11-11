@@ -61,8 +61,8 @@ block contenido
                     option(value="activo", selected=c.estado === 'activo') Activo
                     option(value="inactivo", selected=c.estado === 'inactivo') Inactivo
                     option(value="licencia", selected=c.estado === 'licencia') Licencia
-                form(action=`/clientes/vista/clientes/resetear-password/${c.id}`, method="POST", data-confirm=`¿Confirma el blanqueo de contraseña para ${c.nombre} ${c.apellido}? Se restablecerá a '12345678' y se levantará cualquier bloqueo por intentos fallidos.`)
-                  button.btn-reset-chico(type="submit", title="Restablecer contraseña a 12345678") 🔑 Blanquear Clave
+                form(action=`/clientes/vista/clientes/resetear-password/${c.id}`, method="POST", data-confirm=`¿Confirma el blanqueo de contraseña para ${c.nombre} ${c.apellido}? Se restablecerá a '123456' y se levantará cualquier bloqueo por intentos fallidos.`)
+                  button.btn-reset-chico(type="submit", title="Restablecer contraseña a 123456") 🔑 Blanquear Clave
       else
         tr
           td(colspan="8") No hay usuarios registrados en el padrón.

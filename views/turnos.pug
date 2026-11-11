@@ -8,7 +8,9 @@ block contenido
         p Control de acceso de socios al establecimiento, acreditación en mostrador (Check-in RF-02) y gestión de sobrecupos autorizados.
       div
         button#btn-toggle-sobreturno.btn-secundario(type="button") ⚡ Autorizar Sobreturno
-
+  if exitoReasignacion
+    .alerta.alerta-exito
+      span= exitoReasignacion
   #modal-sobreturno.caja-desplegable(class=(errorSobreturno ? 'activo' : ''))
     .formulario-tarjeta
       h3 ⚡ Autorización de Sobreturno de Recepción (Regla del 15%)
@@ -18,7 +20,6 @@ block contenido
         .alerta.alerta-error
           strong Error: 
           span= errorSobreturno
-
       form(action="/vista/turnos/sobreturno", method="POST", class="form-estilizado")
         .fila-campos
           .grupo-campo
@@ -42,7 +43,6 @@ block contenido
             label(for="motivo") Motivo Justificado (Mín. 5 caracteres):
             input#motivo(type="text", name="motivo", placeholder="Ej: Urgencia médica / derivación", required)
         button.btn-primario(type="submit") Registrar y Autorizar Sobreturno
-
   table.tabla-turnos
     thead
       tr
@@ -76,6 +76,10 @@ block contenido
                 span.badge.badge-reservado Reservado
               else if t.estado === 'atendido'
                 span.badge.badge-atendido Presente / Atendido
+              else if t.estado === 'ausente'
+                span.badge.badge-ausente Ausente
+              else if t.estado === 'reasignado'
+                span.badge.badge-reasignado Reasignado
               else
                 span.badge.badge-cancelado Cancelado
             td
@@ -89,7 +93,10 @@ block contenido
                   form(action=`/vista/turnos/atender/${t.id}`, method="POST")
                     button.btn-exito-chico(type="submit", title="Marcar presente al ingreso del socio") Atender Ingreso
                   form(action=`/vista/turnos/cancelar/${t.id}`, method="POST", data-confirm="¿Cancelar este turno?")
-                    button.btn-peligro-chico(type="submit", title="Cancelar turno") ❌ Cancelar
+                    button.btn-peligro-chico(type="submit", title="Cancelar turno") Cancelar
+              else if t.estado === 'ausente'
+                .acciones-fila
+                  a.btn-exito-chico(href=`/vista/turnos/reasignar/${t.id}`, title="Generar un nuevo turno para el socio") Reasignar Turno
               else if t.estado === 'atendido'
                 span.texto-verde-bold ✔ Acreditado
               else

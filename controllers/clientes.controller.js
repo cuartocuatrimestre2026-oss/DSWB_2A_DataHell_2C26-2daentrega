@@ -302,12 +302,12 @@ exports.resetearPasswordWeb = async (req, res, next) => {
             return res.redirect('/vista/clientes?error=' + encodeURIComponent('Usuario no encontrado.'));
         }
 
-        cliente.password = '12345678';
+        cliente.password = '123456';
         cliente.intentosFallidos = 0;
         cliente.bloqueadoHasta = null;
         await cliente.save();
 
-        res.redirect('/vista/clientes?exito=' + encodeURIComponent(`Contraseña de ${cliente.nombre} ${cliente.apellido} restablecida a '12345678' y bloqueo suspendido.`));
+        res.redirect('/vista/clientes?exito=' + encodeURIComponent(`Contraseña de ${cliente.nombre} ${cliente.apellido} restablecida a '123456' y bloqueo suspendido.`));
     } catch (error) {
         next(error);
     }
