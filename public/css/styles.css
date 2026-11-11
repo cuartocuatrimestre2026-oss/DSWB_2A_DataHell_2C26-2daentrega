@@ -446,6 +446,18 @@ body {
     color: var(--primary-color);
 }
 
+/* Turno no acreditado antes de la hora de inicio */
+.badge-ausente {
+    background-color: #e2e8f0;
+    color: #4a5568;
+}
+
+/* Turno ausente reemplazado por uno nuevo en recepción */
+.badge-reasignado {
+    background-color: #bee3f8;
+    color: #2a4365;
+}
+
 .badge-sobreturno {
     background-color: #fffaf0;
     color: var(--primary-color);

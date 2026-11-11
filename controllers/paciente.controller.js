@@ -5,6 +5,7 @@ const Sala = require('../models/Sala');
 const turnosService = require('../services/turnos.service');
 
 // Franjas horarias homologadas del centro (bloques cerrados de 60 min).
+// Se exporta para que recepción use la misma grilla al reasignar turnos.
 const FRANJAS_HORARIAS = [
     '08:00', '09:00', '10:00', '11:00',
     '14:00', '15:00', '16:00', '17:00',
@@ -23,6 +24,8 @@ async function cargarCatalogos() {
 exports.verMisTurnos = async (req, res, next) => {
     try {
         const clienteId = req.session.usuario.id;
+        // Antes de consultar, los turnos vencidos sin presente pasan a 'ausente'.
+        await turnosService.actualizarAusentes();
         const [turnos, servicios, instructores, salas] = await Promise.all([
             Turno.find({ clienteId }).sort({ fechaHora: 1 }),
             Servicio.find(),
@@ -203,3 +206,5 @@ exports.cancelarMiTurno = async (req, res, next) => {
         next(error);
     }
 };
+
+exports.FRANJAS_HORARIAS = FRANJAS_HORARIAS;

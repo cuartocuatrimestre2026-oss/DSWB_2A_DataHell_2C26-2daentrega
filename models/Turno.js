@@ -30,7 +30,7 @@ const turnoSchema = new mongoose.Schema({
     },
     estado: {
         type: String,
-        enum: ['reservado', 'atendido', 'cancelado'],
+        enum: ['reservado', 'atendido', 'cancelado', 'ausente', 'reasignado'],
         default: 'reservado'
     },
     esSobreturno: {
@@ -52,6 +52,16 @@ turnoSchema.methods.cancelar = function() {
 
 turnoSchema.methods.atender = function() {
     this.estado = 'atendido';
+};
+
+// El socio no fue acreditado en recepción antes de la hora de inicio del turno.
+turnoSchema.methods.marcarAusente = function() {
+    this.estado = 'ausente';
+};
+
+// El turno ausente fue reemplazado por un nuevo turno generado en recepción.
+turnoSchema.methods.marcarReasignado = function() {
+    this.estado = 'reasignado';
 };
 
 module.exports = mongoose.model('Turno', turnoSchema);
