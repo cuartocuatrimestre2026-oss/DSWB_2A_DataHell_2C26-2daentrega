@@ -19,6 +19,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Envío automático desacoplado para selectores de estado en Padrón General.
+    const selectoresEstado = document.querySelectorAll('.js-cambiar-estado-cliente');
+    selectoresEstado.forEach(select => {
+        select.addEventListener('change', () => {
+            if (select.form) {
+                select.form.submit();
+            }
+        });
+    });
+
     // Control de fecha mínima (hoy) en formularios de turnos.
     const inputFecha = document.getElementById('fecha');
     if (inputFecha) {

@@ -43,6 +43,10 @@ block contenido
                 span.badge.badge-reservado Reservado
               else if t.estado === 'atendido'
                 span.badge.badge-atendido Presente / Atendido
+              else if t.estado === 'ausente'
+                span.badge.badge-cancelado Ausente
+              else if t.estado === 'reasignado'
+                span.badge.badge-reservado Reasignado
               else
                 span.badge.badge-cancelado Cancelado
             td= t.esSobreturno ? 'SOBRETURNO' : 'REGULAR'
@@ -59,4 +63,4 @@ block contenido
         tr
           td(colspan="8")
             p Todavía no tenés ningún turno reservado.
-            a.btn-primario(href="/reservar") Reservá tu primera clase ahora &rarr;
+            a.btn-primario(href="/reservar") Reservá tu primera clase ahora →

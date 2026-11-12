@@ -19,8 +19,8 @@ exports.listarClientes = async (req, res, next) => {
     try {
         const { estado, rol } = req.query;
         const filtro = {};
-        if (estado) filtro.estado = estado;
-        if (rol) filtro.rol = rol;
+        if (typeof estado === 'string' && estado.trim()) filtro.estado = estado.trim();
+        if (typeof rol === 'string' && rol.trim()) filtro.rol = rol.trim();
 
         const clientes = await Cliente.find(filtro).select('-password').sort({ id: 1 });
         const resultado = clientes.map(c => {
@@ -155,12 +155,18 @@ exports.actualizarCliente = async (req, res, next) => {
         const usuarioAutenticado = req.usuarioJWT || req.usuario || req.user || (req.session && req.session.usuario);
         const { nombre, apellido, telefono, estado, patologiasActivas, rol, password, fechaEmisionApto, fechaVencimientoApto } = req.body;
 
-        // Un socio autenticado no puede cargar su propio apto ni cambiar su rol.
+        // Protección IDOR y escalada de privilegios para socios autenticados.
         if (usuarioAutenticado && usuarioAutenticado.rol === 'cliente') {
-            if (fechaEmisionApto !== undefined || fechaVencimientoApto !== undefined || rol !== undefined) {
+            if (Number(req.params.id) !== Number(usuarioAutenticado.id)) {
                 return res.status(403).json({
                     error: 'Acceso denegado',
-                    detalle: 'Un socio no puede cargar su propio apto médico ni auto-escalar roles.'
+                    detalle: 'No posee permisos para modificar perfiles de otros usuarios.'
+                });
+            }
+            if (fechaEmisionApto !== undefined || fechaVencimientoApto !== undefined || rol !== undefined || estado !== undefined) {
+                return res.status(403).json({
+                    error: 'Acceso denegado',
+                    detalle: 'Un socio no puede cargar su propio apto médico ni alterar su rol o estado.'
                 });
             }
         }
@@ -209,9 +215,11 @@ exports.actualizarCliente = async (req, res, next) => {
         if (telefono !== undefined) cliente.telefono = String(telefono).trim();
         if (patologiasActivas !== undefined) cliente.patologiasActivas = String(patologiasActivas).trim();
         if (rol && usuarioAutenticado && usuarioAutenticado.rol === 'empleado') cliente.rol = rol;
-        if (estado && ['activo', 'inactivo', 'licencia'].includes(estado)) cliente.estado = estado;
+        if (estado && ['activo', 'inactivo', 'licencia'].includes(estado) && usuarioAutenticado && usuarioAutenticado.rol === 'empleado') {
+            cliente.estado = estado;
+        }
 
-        // Actualización de contraseña, porta cambio de clave por API y blanqueo.
+        // Actualización de contraseña, soporta cambio de clave por API y blanqueo.
         if (password) {
             cliente.password = String(password).trim();
             cliente.intentosFallidos = 0;
@@ -226,6 +234,9 @@ exports.actualizarCliente = async (req, res, next) => {
 
         res.status(200).json(respuesta);
     } catch (error) {
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ error: 'Validación fallida', detalle: error.message });
+        }
         next(error);
     }
 };
@@ -283,6 +294,10 @@ exports.cambiarEstadoClienteWeb = async (req, res, next) => {
             return res.redirect('/vista/clientes?error=' + encodeURIComponent('El usuario seleccionado no existe.'));
         }
 
+        if (nuevoEstado === 'licencia' && cliente.rol !== 'empleado') {
+            return res.redirect('/vista/clientes?error=' + encodeURIComponent('El estado "licencia" solo aplica al personal administrativo.'));
+        }
+
         if (['activo', 'inactivo', 'licencia'].includes(nuevoEstado)) {
             cliente.estado = nuevoEstado;
             await cliente.save();
@@ -290,6 +305,9 @@ exports.cambiarEstadoClienteWeb = async (req, res, next) => {
 
         res.redirect('/vista/clientes?exito=' + encodeURIComponent(`Estado de ${cliente.nombre} ${cliente.apellido} actualizado a '${nuevoEstado}'.`));
     } catch (error) {
+        if (error.name === 'ValidationError') {
+            return res.redirect('/vista/clientes?error=' + encodeURIComponent(error.message));
+        }
         next(error);
     }
 };
@@ -316,12 +334,18 @@ exports.resetearPasswordWeb = async (req, res, next) => {
 // GET /vista/apto-fisico - Consola Web - Apto Médico.
 exports.mostrarAptoFisicoWeb = async (req, res, next) => {
     try {
-        const clientes = await Cliente.find({ rol: 'cliente' }).select('-password').sort({ apellido: 1, nombre: 1 });
+        const clientes = await Cliente.find({ rol: 'cliente', estado: 'activo' }).select('-password').sort({ apellido: 1, nombre: 1 });
+        const sociosMapeados = clientes.map(c => {
+            const obj = c.toObject();
+            obj.aptoMedicoVigente = calcularAptoVigente(obj.fechaVencimientoApto);
+            return obj;
+        });
         res.render('apto-fisico', {
-            clientes,
+            socios: sociosMapeados,
+            clientes: sociosMapeados,
             usuario: req.session.usuario,
-            mensajeExito: req.query.exito || null,
-            mensajeError: req.query.error || null
+            errorApto: req.query.errorApto || req.query.error || null,
+            exitoApto: req.query.exitoApto || req.query.exito || null
         });
     } catch (error) {
         next(error);

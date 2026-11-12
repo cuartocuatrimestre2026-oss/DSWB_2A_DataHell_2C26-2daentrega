@@ -57,10 +57,11 @@ block contenido
             td
               .acciones-fila
                 form(action=`/clientes/vista/clientes/cambiar-estado/${c.id}`, method="POST")
-                  select(name="nuevoEstado", onchange="this.form.submit()")
+                  select.js-cambiar-estado-cliente(name="nuevoEstado")
                     option(value="activo", selected=c.estado === 'activo') Activo
                     option(value="inactivo", selected=c.estado === 'inactivo') Inactivo
-                    option(value="licencia", selected=c.estado === 'licencia') Licencia
+                    if c.rol === 'empleado'
+                      option(value="licencia", selected=c.estado === 'licencia') Licencia
                 form(action=`/clientes/vista/clientes/resetear-password/${c.id}`, method="POST", data-confirm=`¿Confirma el blanqueo de contraseña para ${c.nombre} ${c.apellido}? Se restablecerá a '123456' y se levantará cualquier bloqueo por intentos fallidos.`)
                   button.btn-reset-chico(type="submit", title="Restablecer contraseña a 123456") 🔑 Blanquear Clave
       else

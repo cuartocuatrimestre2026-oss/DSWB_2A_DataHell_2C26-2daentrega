@@ -11,6 +11,8 @@ const FRANJAS_HORARIAS = [
     '18:00', '19:00', '20:00'
 ];
 
+exports.FRANJAS_HORARIAS = FRANJAS_HORARIAS;
+
 async function cargarCatalogos() {
     return await Promise.all([
         Servicio.find().sort({ id: 1 }),

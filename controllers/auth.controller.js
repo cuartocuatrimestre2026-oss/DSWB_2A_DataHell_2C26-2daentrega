@@ -23,10 +23,10 @@ async function autenticarUsuario(identificador, password) {
     // Control de suspensión por fuerza bruta.
     if (usuario.bloqueadoHasta && usuario.bloqueadoHasta > new Date()) {
         const minutosRestantes = Math.ceil((usuario.bloqueadoHasta - new Date()) / (1000 * 60));
-        return { 
-            exito: false, 
-            status: 403, 
-            mensaje: `Acceso suspendido temporalmente por seguridad por reiterados intentos fallidos. Intente nuevamente en ${minutosRestantes} minuto(s).` 
+        return {
+            exito: false,
+            status: 403,
+            mensaje: `Acceso suspendido temporalmente por seguridad por reiterados intentos fallidos. Intente nuevamente en ${minutosRestantes} minuto(s).`
         };
     }
 
@@ -124,9 +124,7 @@ exports.generarTokenJWT = async (req, res, next) => {
             rol: usuario.rol
         };
 
-        // Vigencia diferenciada por perfil de seguridad:
-        // El personal administrativo posee permisos críticos sobre la base de datos (1h de vigencia).
-        // Los socios/clientes operan con perfil restringido (2h de vigencia).
+        // Vigencia diferenciada por perfil de seguridad.
         const tiempoExpiracion = usuario.rol === 'empleado' ? '1h' : '2h';
         const token = jwt.sign(payload, secreto, { expiresIn: tiempoExpiracion });
 
@@ -189,7 +187,7 @@ exports.procesarRegistro = async (req, res, next) => {
             password: password.trim(),
             rol: 'cliente',
             estado: 'activo',
-            aptoMedicoVigente: true,
+            aptoMedicoVigente: false,
             patologiasActivas: ''
         });
 

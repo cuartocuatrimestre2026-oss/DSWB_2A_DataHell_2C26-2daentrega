@@ -21,11 +21,15 @@ const salaSchema = new mongoose.Schema({
 });
 
 // Métodos de dominio y reglas de negocio
-salaSchema.methods.calcularSobreturnosPermitidos = function() {
+salaSchema.methods.calcularSobreturnosPermitidos = function () {
+    // Regla estricta RF-02 / RN06: En Pilates Reformer el sobreturno es 0% (camillas rígidas).
+    if (this.id === 1 || (this.nombre && this.nombre.toLowerCase().includes('reformer'))) {
+        return 0;
+    }
     return Math.floor(this.capacidadNormal * 0.15);
 };
 
-salaSchema.methods.admiteSobreturno = function(sobreturnosActuales) {
+salaSchema.methods.admiteSobreturno = function (sobreturnosActuales) {
     return sobreturnosActuales < this.calcularSobreturnosPermitidos();
 };
 
